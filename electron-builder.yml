@@ -1,0 +1,34 @@
+appId: com.enput.vps-manager
+productName: Enput VPS Manager
+directories:
+  output: release
+  buildResources: public
+
+files:
+  - dist/**/*
+  - package.json
+
+win:
+  target:
+    - nsis
+  artifactName: ${productName}-${version}-Setup.${ext}
+  icon: public/icons/icon.ico
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Enput VPS Manager
+
+mac:
+  target:
+    - dmg
+    - zip
+  icon: public/icons/icon.icns
+
+linux:
+  target:
+    - AppImage
+    - deb
+  icon: public/icons
