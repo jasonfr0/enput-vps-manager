@@ -59,7 +59,9 @@ export function TerminalView({ connId }: TerminalViewProps) {
     // is called after every fit so the cursor stays in view.
     const syncSize = () => {
       fitAddon.fit()
-      terminal.scrollToBottom()
+      // Defer scrollToBottom one frame so xterm's resize render completes
+      // before we set the viewport position.
+      requestAnimationFrame(() => terminal.scrollToBottom())
       if (shellIdRef.current) {
         window.api.terminal.resize(connId, shellIdRef.current, terminal.cols, terminal.rows)
       }
@@ -92,8 +94,10 @@ export function TerminalView({ connId }: TerminalViewProps) {
 
     const unsubOutput = window.api.terminal.onOutput(({ shellId, data }) => {
       if (shellId === shellIdRef.current) {
-        terminal.write(data)
-        terminal.scrollToBottom()
+        // Use the write callback so scrollToBottom fires AFTER xterm has
+        // parsed and buffered the new data — not before, which would scroll
+        // to the old bottom and leave the cursor off-screen.
+        terminal.write(data, () => terminal.scrollToBottom())
       }
     })
 

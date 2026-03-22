@@ -63,7 +63,9 @@ export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
     // fit ensures the cursor stays visible.
     const syncSize = () => {
       fitAddon.fit()
-      terminal.scrollToBottom()
+      // Defer scrollToBottom one frame so xterm's resize render completes
+      // before we set the viewport position.
+      requestAnimationFrame(() => terminal.scrollToBottom())
       if (shellIdRef.current) {
         window.api.terminal.resize(connId, shellIdRef.current, terminal.cols, terminal.rows)
       }
@@ -87,8 +89,9 @@ export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
 
     const unsubOutput = window.api.terminal.onOutput(({ shellId, data }: { shellId: string; data: string }) => {
       if (shellId !== shellIdRef.current) return
-      terminal.write(data)
-      terminal.scrollToBottom()
+      // Callback fires after xterm has parsed and buffered the data, so
+      // scrollToBottom lands at the real new bottom, not the old one.
+      terminal.write(data, () => terminal.scrollToBottom())
       if (!hasChecked) {
         outputBuffer += data
         if (outputBuffer.includes('CLAUDE_FOUND')) {
