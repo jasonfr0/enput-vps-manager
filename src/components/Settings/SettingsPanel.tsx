@@ -71,19 +71,22 @@ function Select({ value, options, onChange }: {
 // ─── About version row with update check button ───────────────────
 function AboutVersionRow() {
   const { status, version, check } = useUpdateStore()
+  // app version injected by Vite/electron-vite at build time
+  const appVersion: string = (import.meta as any).env?.VITE_APP_VERSION ?? '1.1.0'
+  const isPackaged = !((import.meta as any).env?.DEV)
 
   const statusLabel: Record<string, string> = {
-    checking:     'Checking…',
-    available:    `v${version} available`,
-    downloading:  'Downloading…',
-    ready:        `v${version} ready to install`,
+    checking:        'Checking…',
+    available:       `v${version} available`,
+    downloading:     'Downloading…',
+    ready:           `v${version} ready to install`,
     'not-available': 'Up to date',
-    error:        'Check failed',
+    error:           'Check failed',
   }
 
   return (
-    <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-      <span style={s.mutedText}>v1.0.0</span>
+    <span style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' as const }}>
+      <span style={s.mutedText}>v{appVersion}</span>
       {status !== 'idle' && status !== 'checking' && (
         <span style={{
           fontSize: '11px',
@@ -93,12 +96,18 @@ function AboutVersionRow() {
         </span>
       )}
       <button
-        style={{ ...s.smallBtn, opacity: status === 'checking' ? 0.6 : 1 }}
+        style={{ ...s.smallBtn, opacity: (status === 'checking' || !isPackaged) ? 0.6 : 1 }}
         onClick={() => check()}
         disabled={status === 'checking' || status === 'downloading'}
+        title={!isPackaged ? 'Update checks only work in the packaged app (npm run release:win)' : undefined}
       >
         {status === 'checking' ? 'Checking…' : 'Check for updates'}
       </button>
+      {!isPackaged && (
+        <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+          (dev build)
+        </span>
+      )}
     </span>
   )
 }

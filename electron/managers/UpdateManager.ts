@@ -52,6 +52,12 @@ export class UpdateManager {
 
   /** Check once on startup (with a short delay so app feels snappy). */
   checkOnStartup(): void {
+    // electron-updater only works in a packaged app — skip entirely in dev
+    if (!app.isPackaged) {
+      log.info('[UpdateManager] Skipping update check — running in dev mode (unpackaged)')
+      return
+    }
+
     setTimeout(() => {
       this.checkForUpdates()
     }, STARTUP_DELAY_MS)
@@ -64,24 +70,24 @@ export class UpdateManager {
 
   /** Trigger a manual update check from the renderer. */
   async checkForUpdates(): Promise<void> {
-    log.info('[UpdateManager] Checking for updates…')
-    try {
-      await autoUpdater.checkForUpdates()
-    } catch (err: any) {
-      log.error('[UpdateManager] checkForUpdates failed:', err.message)
-      this.setState({ status: 'error', error: err.message })
+    // electron-updater requires a packaged app to locate app-update.yml
+    if (!app.isPackaged) {
+      log.info('[UpdateManager] Skipping update check — running in dev mode (unpackaged)')
+      this.setState({ status: 'not-available' })
+      return
     }
+
+    log.info('[UpdateManager] Checking for updates…')
+    // Don't wrap in try/catch here — the 'error' event listener below handles
+    // all failures, and catching here as well causes setState to be called twice.
+    await autoUpdater.checkForUpdates()
   }
 
   /** Start downloading the available update. */
   async downloadUpdate(): Promise<void> {
     log.info('[UpdateManager] Starting download…')
-    try {
-      await autoUpdater.downloadUpdate()
-    } catch (err: any) {
-      log.error('[UpdateManager] downloadUpdate failed:', err.message)
-      this.setState({ status: 'error', error: err.message })
-    }
+    // Errors surface through the 'error' event listener — no need to catch here too
+    await autoUpdater.downloadUpdate()
   }
 
   /** Quit and install the downloaded update immediately. */
@@ -159,7 +165,21 @@ export class UpdateManager {
 
     autoUpdater.on('error', (err: Error) => {
       log.error('[UpdateManager] error:', err.message)
-      this.setState({ status: 'error', error: err.message })
+
+      // A 404 means no releases have been published yet — treat it as
+      // "up to date" rather than surfacing a confusing error to the user.
+      const msg = err.message ?? ''
+      if (
+        msg.includes('404') ||
+        msg.includes('net::ERR_') ||
+        msg.toLowerCase().includes('cannot find latest')
+      ) {
+        log.info('[UpdateManager] No releases found — treating as up to date')
+        this.setState({ status: 'not-available' })
+        return
+      }
+
+      this.setState({ status: 'error', error: msg })
     })
   }
 

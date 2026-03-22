@@ -1,6 +1,9 @@
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import react from '@vitejs/plugin-react'
 import { resolve } from 'path'
+import { readFileSync } from 'fs'
+
+const pkg = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf-8'))
 
 export default defineConfig({
   main: {
@@ -34,6 +37,10 @@ export default defineConfig({
       alias: {
         '@': resolve(__dirname, 'src')
       }
+    },
+    define: {
+      // Makes the package.json version available as import.meta.env.VITE_APP_VERSION
+      'import.meta.env.VITE_APP_VERSION': JSON.stringify(pkg.version),
     }
   }
 })

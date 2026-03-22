@@ -136,7 +136,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   terminal: {
     height: '100%',
-    padding: '4px',
+    overflow: 'hidden',
   },
   loading: {
     position: 'absolute',

@@ -283,7 +283,7 @@ const styles: Record<string, React.CSSProperties> = {
   terminal: {
     position: 'absolute',
     inset: 0,
-    padding: '4px',
+    overflow: 'hidden',
   },
   loading: {
     position: 'absolute',
