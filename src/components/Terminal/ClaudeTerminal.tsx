@@ -63,8 +63,12 @@ export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
     // fit ensures the cursor stays visible.
     const syncSize = () => {
       fitAddon.fit()
-      // Defer scrollToBottom one frame so xterm's resize render completes
-      // before we set the viewport position.
+      // Call scrollToBottom twice: once immediately (before the resize
+      // render) and once after the next frame (after xterm's post-resize
+      // repaint). Without both calls, fit()'s internal terminal.resize()
+      // resets the viewport to the top and the single deferred call
+      // sometimes loses the race against xterm's own render.
+      terminal.scrollToBottom()
       requestAnimationFrame(() => terminal.scrollToBottom())
       if (shellIdRef.current) {
         window.api.terminal.resize(connId, shellIdRef.current, terminal.cols, terminal.rows)
@@ -133,7 +137,7 @@ export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
             requestAnimationFrame(() => {
               fitAddon.fit()
               terminal.scrollToBottom()
-              resolve()
+              requestAnimationFrame(() => { terminal.scrollToBottom(); resolve() })
             })
           })
         })
