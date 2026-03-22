@@ -131,6 +131,13 @@ export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
         await new Promise<void>((resolve) => setTimeout(resolve, 700))
         terminal.reset()     // clears viewport + scrollback (goodbye, banner)
 
+        // reset() wipes xterm's internal dimension state — re-fit so the
+        // terminal knows how many cols/rows it actually has. Without this,
+        // scroll is broken for the lifetime of the session.
+        await new Promise<void>((resolve) => {
+          requestAnimationFrame(() => { requestAnimationFrame(() => { fitAddon.fit(); resolve() }) })
+        })
+
         // Now reveal the terminal
         setIsReady(true)
 

@@ -55,7 +55,16 @@ export function TerminalView({ connId }: TerminalViewProps) {
     const fitAddon = new FitAddon()
     terminal.loadAddon(fitAddon)
     terminal.open(termRef.current)
-    fitAddon.fit()
+
+    // Double rAF: wait for the browser to do a full layout pass so the
+    // container has real pixel dimensions before fitting. Without this,
+    // the div is still 0×0 and xterm initialises with 0 cols/rows,
+    // which breaks scrolling for the entire lifetime of the terminal.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        fitAddon.fit()
+      })
+    })
 
     terminalRef.current = terminal
     fitAddonRef.current = fitAddon

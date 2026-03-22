@@ -78,9 +78,14 @@ export class UpdateManager {
     }
 
     log.info('[UpdateManager] Checking for updates…')
-    // Don't wrap in try/catch here — the 'error' event listener below handles
-    // all failures, and catching here as well causes setState to be called twice.
-    await autoUpdater.checkForUpdates()
+    try {
+      await autoUpdater.checkForUpdates()
+    } catch {
+      // autoUpdater also emits the 'error' event for every failure, and that
+      // listener is responsible for updating state. We just swallow here so
+      // the rejected promise doesn't propagate through the IPC handler and
+      // show "Error invoking remote method" in the renderer.
+    }
   }
 
   /** Start downloading the available update. */
