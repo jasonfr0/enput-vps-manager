@@ -66,8 +66,6 @@ jobs:
         include:
           - os: windows-latest
             platform: win
-          - os: macos-latest
-            platform: mac
           - os: ubuntu-22.04
             platform: linux
 
@@ -119,20 +117,6 @@ jobs:
           # AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
           # AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
         run: npm run dist:win
-
-      # ── macOS: package (+ sign + notarize when certs are present) ─────────
-      - name: Package (macOS)
-        if: matrix.os == 'macos-latest'
-        env:
-          CSC_LINK: ${{ secrets.CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          # Prevent electron-builder from scanning the runner's keychain for a
-          # signing identity when no CSC_LINK secret is configured.
-          CSC_IDENTITY_AUTO_DISCOVERY: ${{ secrets.CSC_LINK != '' }}
-        run: npm run dist:mac
 
       # ── Linux: package ─────────────────────────────────────────────────────
       - name: Package (Linux)
@@ -212,8 +196,6 @@ jobs:
           files: |
             release-artifacts/*.exe
             release-artifacts/*.msi
-            release-artifacts/*.dmg
-            release-artifacts/*.zip
             release-artifacts/*.AppImage
             release-artifacts/*.deb
             release-artifacts/*.rpm
