@@ -8,8 +8,8 @@ interface TerminalViewProps {
 }
 
 export function TerminalView({ connId }: TerminalViewProps) {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const termRef    = useRef<HTMLDivElement>(null)
+  const wrapperRef  = useRef<HTMLDivElement>(null)
+  const termRef     = useRef<HTMLDivElement>(null)
   const terminalRef = useRef<Terminal | null>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
   const shellIdRef  = useRef<string | null>(null)
@@ -17,7 +17,9 @@ export function TerminalView({ connId }: TerminalViewProps) {
   const { terminalFontSize, terminalScrollback, terminalCursorStyle, terminalCursorBlink } = useSettingsStore()
 
   useEffect(() => {
-    if (!termRef.current || !containerRef.current) return
+    const wrapper = wrapperRef.current
+    const termEl  = termRef.current
+    if (!wrapper || !termEl) return
 
     const terminal = new Terminal({
       theme: {
@@ -45,19 +47,35 @@ export function TerminalView({ connId }: TerminalViewProps) {
 
     const fitAddon = new FitAddon()
     terminal.loadAddon(fitAddon)
-    terminal.open(termRef.current)
-
-    // Wait for a full layout pass so the container has real pixel dimensions.
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        fitAddon.fit()
-      })
-    })
+    terminal.open(termEl)
 
     terminalRef.current = terminal
     fitAddonRef.current = fitAddon
 
-    // Create SSH shell
+    // ── Size sync ──────────────────────────────────────────────────────────
+    // Measure the wrapper's actual pixel bounds and stamp those exact
+    // dimensions onto the terminal div. FitAddon then reads those explicit
+    // pixels and calculates the correct rows/cols. This avoids every CSS
+    // percentage / flex / absolute-positioning height-chain issue.
+    const syncSize = () => {
+      const { width, height } = wrapper.getBoundingClientRect()
+      if (width === 0 || height === 0) return          // not laid out yet
+      termEl.style.width  = `${Math.floor(width)}px`
+      termEl.style.height = `${Math.floor(height)}px`
+      fitAddon.fit()
+      if (shellIdRef.current) {
+        window.api.terminal.resize(connId, shellIdRef.current, terminal.cols, terminal.rows)
+      }
+    }
+
+    // Initial fit — wait for two frames so the flex layout is done.
+    requestAnimationFrame(() => requestAnimationFrame(syncSize))
+
+    // Re-fit whenever the wrapper resizes (window resize, sidebar toggle, etc.)
+    const ro = new ResizeObserver(syncSize)
+    ro.observe(wrapper)
+
+    // ── Shell ──────────────────────────────────────────────────────────────
     const initShell = async () => {
       try {
         const { cols, rows } = terminal
@@ -72,19 +90,8 @@ export function TerminalView({ connId }: TerminalViewProps) {
     initShell()
 
     terminal.onData((data) => {
-      if (shellIdRef.current) {
-        window.api.terminal.write(connId, shellIdRef.current, data)
-      }
+      if (shellIdRef.current) window.api.terminal.write(connId, shellIdRef.current, data)
     })
-
-    // Observe the container (which is bounded), not the termRef div.
-    const resizeObserver = new ResizeObserver(() => {
-      fitAddon.fit()
-      if (shellIdRef.current) {
-        window.api.terminal.resize(connId, shellIdRef.current, terminal.cols, terminal.rows)
-      }
-    })
-    resizeObserver.observe(containerRef.current!)
 
     const unsubOutput = window.api.terminal.onOutput(({ shellId, data }) => {
       if (shellId === shellIdRef.current) terminal.write(data)
@@ -92,17 +99,15 @@ export function TerminalView({ connId }: TerminalViewProps) {
 
     return () => {
       unsubOutput()
-      resizeObserver.disconnect()
+      ro.disconnect()
       if (shellIdRef.current) window.api.terminal.close(connId, shellIdRef.current)
       terminal.dispose()
     }
   }, [connId, terminalFontSize, terminalScrollback, terminalCursorStyle, terminalCursorBlink])
 
   return (
-    // Root fills .tab-content exactly via position:absolute so there is no
-    // ambiguity about what "100%" means — the layout never expands with content.
-    <div ref={containerRef} style={styles.root}>
-      <div ref={termRef} style={styles.term} />
+    <div ref={wrapperRef} style={styles.wrapper}>
+      <div ref={termRef} /* dimensions set by syncSize() */ />
       {!isReady && (
         <div style={styles.loading}>
           <span>Connecting to shell...</span>
@@ -113,19 +118,13 @@ export function TerminalView({ connId }: TerminalViewProps) {
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  // Fills .tab-content (position:relative) exactly. Nothing here can grow.
-  root: {
+  // The wrapper IS the bounding box. overflow:hidden clips anything that
+  // extends beyond it. Its size comes from .tab-content via absolute pos.
+  wrapper: {
     position: 'absolute',
     inset: 0,
-    background: '#1a1b2e',
     overflow: 'hidden',
-  },
-  // The div passed to terminal.open(). Must NOT have overflow:hidden —
-  // xterm's .xterm-viewport (overflow-y:scroll) manages its own clipping.
-  // position:absolute + inset:0 pins it to the root bounds.
-  term: {
-    position: 'absolute',
-    inset: 0,
+    background: '#1a1b2e',
   },
   loading: {
     position: 'absolute',

@@ -8,9 +8,8 @@ interface ClaudeTerminalProps {
 }
 
 export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
-  const rootRef    = useRef<HTMLDivElement>(null)
-  const termRef    = useRef<HTMLDivElement>(null)
-  const wrapperRef = useRef<HTMLDivElement>(null)
+  const wrapperRef  = useRef<HTMLDivElement>(null)
+  const termRef     = useRef<HTMLDivElement>(null)
   const terminalRef = useRef<Terminal | null>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
   const shellIdRef  = useRef<string | null>(null)
@@ -22,7 +21,9 @@ export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
   const [loadingMsg, setLoadingMsg] = useState('Connecting to VPS…')
 
   useEffect(() => {
-    if (!termRef.current || !wrapperRef.current) return
+    const wrapper = wrapperRef.current
+    const termEl  = termRef.current
+    if (!wrapper || !termEl) return
 
     const terminal = new Terminal({
       theme: {
@@ -50,34 +51,39 @@ export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
 
     const fitAddon = new FitAddon()
     terminal.loadAddon(fitAddon)
-    terminal.open(termRef.current)
-
-    // Wait for a full layout pass so the container has real pixel dimensions.
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        fitAddon.fit()
-      })
-    })
+    terminal.open(termEl)
 
     terminalRef.current = terminal
     fitAddonRef.current = fitAddon
 
-    terminal.onData((data) => {
-      if (shellIdRef.current) {
-        window.api.terminal.write(connId, shellIdRef.current, data)
-      }
-    })
-
-    // Observe the wrapper div — it is the bounded element whose size
-    // is determined by flex layout, not by xterm content.
-    const resizeObserver = new ResizeObserver(() => {
+    // ── Size sync ──────────────────────────────────────────────────────────
+    // Measure the wrapper's actual pixel bounds and stamp those exact
+    // dimensions onto the terminal div so FitAddon calculates the right
+    // rows/cols. This avoids every CSS height-chain issue.
+    const syncSize = () => {
+      const { width, height } = wrapper.getBoundingClientRect()
+      if (width === 0 || height === 0) return
+      termEl.style.width  = `${Math.floor(width)}px`
+      termEl.style.height = `${Math.floor(height)}px`
       fitAddon.fit()
       if (shellIdRef.current) {
         window.api.terminal.resize(connId, shellIdRef.current, terminal.cols, terminal.rows)
       }
-    })
-    resizeObserver.observe(wrapperRef.current!)
+    }
 
+    // Initial fit after layout
+    requestAnimationFrame(() => requestAnimationFrame(syncSize))
+
+    // Re-fit on wrapper resize
+    const ro = new ResizeObserver(syncSize)
+    ro.observe(wrapper)
+
+    // ── Input ──────────────────────────────────────────────────────────────
+    terminal.onData((data) => {
+      if (shellIdRef.current) window.api.terminal.write(connId, shellIdRef.current, data)
+    })
+
+    // ── Output ─────────────────────────────────────────────────────────────
     let outputBuffer = ''
     let hasChecked = false
 
@@ -106,6 +112,7 @@ export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
       }
     })
 
+    // ── Shell init ─────────────────────────────────────────────────────────
     const initClaudeShell = async () => {
       try {
         setLoadingMsg('Connecting to VPS…')
@@ -117,9 +124,9 @@ export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
         await new Promise<void>((resolve) => setTimeout(resolve, 700))
         terminal.reset()
 
-        // reset() wipes xterm's dimension state — re-fit after a layout pass.
+        // reset() wipes xterm dimension state — re-sync after a layout pass.
         await new Promise<void>((resolve) => {
-          requestAnimationFrame(() => { requestAnimationFrame(() => { fitAddon.fit(); resolve() }) })
+          requestAnimationFrame(() => { requestAnimationFrame(() => { syncSize(); resolve() }) })
         })
 
         setIsReady(true)
@@ -140,7 +147,7 @@ export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
 
     return () => {
       unsubOutput()
-      resizeObserver.disconnect()
+      ro.disconnect()
       if (shellIdRef.current) window.api.terminal.close(connId, shellIdRef.current)
       terminal.dispose()
     }
@@ -159,8 +166,8 @@ export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
   }
 
   return (
-    // Root fills .tab-content (position:relative) exactly.
-    <div ref={rootRef} style={styles.root}>
+    <div style={styles.root}>
+      {/* Top bar — fixed height, outside the terminal measurement */}
       <div style={styles.topBar}>
         <div style={styles.topBarLeft}>
           <span style={{ fontSize: '14px' }}>✨</span>
@@ -168,15 +175,15 @@ export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
           <span style={{
             ...styles.statusBadge,
             background:
-              claudeStatus === 'running'       ? 'var(--success)'  :
-              claudeStatus === 'not-installed' ? 'var(--warning)'  :
-              claudeStatus === 'error'         ? 'var(--error)'    :
+              claudeStatus === 'running'       ? 'var(--success)' :
+              claudeStatus === 'not-installed' ? 'var(--warning)' :
+              claudeStatus === 'error'         ? 'var(--error)'   :
               'var(--text-muted)',
           }}>
-            {claudeStatus === 'checking'      ? 'Checking…'    :
-             claudeStatus === 'not-installed' ? 'Not Installed' :
-             claudeStatus === 'launching'     ? 'Launching…'   :
-             claudeStatus === 'running'       ? 'Running'      : 'Error'}
+            {claudeStatus === 'checking'      ? 'Checking…'     :
+             claudeStatus === 'not-installed' ? 'Not Installed'  :
+             claudeStatus === 'launching'     ? 'Launching…'    :
+             claudeStatus === 'running'       ? 'Running'       : 'Error'}
           </span>
         </div>
         <div style={{ display: 'flex', gap: '6px' }}>
@@ -193,11 +200,10 @@ export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
         </div>
       </div>
 
-      {/* wrapperRef is the bounded flex element that ResizeObserver watches.
-          overflow:hidden clips xterm visually. The termRef div inside is
-          position:absolute so xterm fills the wrapper exactly. */}
+      {/* Wrapper = the measurement box. syncSize() reads its pixel bounds
+          and stamps them onto termRef. overflow:hidden clips visual excess. */}
       <div ref={wrapperRef} style={styles.termWrapper}>
-        <div ref={termRef} style={styles.term} />
+        <div ref={termRef} /* width/height set by syncSize() */ />
         {!isReady && (
           <div style={styles.loading}>
             <div style={styles.loadingDot} />
@@ -210,14 +216,13 @@ export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  // Fills .tab-content (position:relative) exactly via absolute positioning.
   root: {
     position: 'absolute',
     inset: 0,
     display: 'flex',
     flexDirection: 'column',
-    background: '#1a1a2e',
     overflow: 'hidden',
+    background: '#1a1a2e',
   },
   topBar: {
     display: 'flex',
@@ -244,21 +249,13 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 500,
     cursor: 'pointer',
   },
-  // flex:1 + minHeight:0 lets this fill remaining root height without growing.
-  // overflow:hidden clips xterm visually; position:relative anchors the
-  // absolutely-positioned term div and loading overlay.
+  // Wrapper fills remaining root height. overflow:hidden clips xterm.
+  // syncSize() reads this element's getBoundingClientRect() and sets the
+  // terminal div's pixel dimensions to match — no CSS ambiguity.
   termWrapper: {
     flex: 1,
     minHeight: 0,
-    position: 'relative',
     overflow: 'hidden',
-  },
-  // The div passed to terminal.open(). position:absolute + inset:0 pins it
-  // exactly to termWrapper's pixel bounds. NO overflow:hidden — xterm's own
-  // .xterm-viewport (overflow-y:scroll) handles clipping and scrolling.
-  term: {
-    position: 'absolute',
-    inset: 0,
   },
   loading: {
     position: 'absolute',
