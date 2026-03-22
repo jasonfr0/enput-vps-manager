@@ -53,16 +53,13 @@ export function TerminalView({ connId }: TerminalViewProps) {
     fitAddonRef.current = fitAddon
 
     // ── Size sync ──────────────────────────────────────────────────────────
-    // Measure the wrapper's actual pixel bounds and stamp those exact
-    // dimensions onto the terminal div. FitAddon then reads those explicit
-    // pixels and calculates the correct rows/cols. This avoids every CSS
-    // percentage / flex / absolute-positioning height-chain issue.
+    // termEl is position:absolute; inset:0 inside wrapper, so it always
+    // fills wrapper exactly. FitAddon reads termEl's offsetWidth/Height
+    // (== wrapper's rendered size) to calculate cols/rows. scrollToBottom()
+    // is called after every fit so the cursor stays in view.
     const syncSize = () => {
-      const { width, height } = wrapper.getBoundingClientRect()
-      if (width === 0 || height === 0) return          // not laid out yet
-      termEl.style.width  = `${Math.floor(width)}px`
-      termEl.style.height = `${Math.floor(height)}px`
       fitAddon.fit()
+      terminal.scrollToBottom()
       if (shellIdRef.current) {
         window.api.terminal.resize(connId, shellIdRef.current, terminal.cols, terminal.rows)
       }
@@ -94,7 +91,10 @@ export function TerminalView({ connId }: TerminalViewProps) {
     })
 
     const unsubOutput = window.api.terminal.onOutput(({ shellId, data }) => {
-      if (shellId === shellIdRef.current) terminal.write(data)
+      if (shellId === shellIdRef.current) {
+        terminal.write(data)
+        terminal.scrollToBottom()
+      }
     })
 
     return () => {
@@ -107,7 +107,7 @@ export function TerminalView({ connId }: TerminalViewProps) {
 
   return (
     <div ref={wrapperRef} style={styles.wrapper}>
-      <div ref={termRef} /* dimensions set by syncSize() */ />
+      <div ref={termRef} style={styles.term} />
       {!isReady && (
         <div style={styles.loading}>
           <span>Connecting to shell...</span>
@@ -125,6 +125,15 @@ const styles: Record<string, React.CSSProperties> = {
     inset: 0,
     overflow: 'hidden',
     background: '#1a1b2e',
+  },
+  // termEl fills wrapper exactly via absolute+inset:0. Being absolutely
+  // positioned it never participates in normal flow, so xterm's canvas and
+  // viewport cannot push the layout. overflow:hidden clips any sub-pixel
+  // overhang from the canvas sizing calculations.
+  term: {
+    position: 'absolute',
+    inset: 0,
+    overflow: 'hidden',
   },
   loading: {
     position: 'absolute',

@@ -57,15 +57,13 @@ export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
     fitAddonRef.current = fitAddon
 
     // ── Size sync ──────────────────────────────────────────────────────────
-    // Measure the wrapper's actual pixel bounds and stamp those exact
-    // dimensions onto the terminal div so FitAddon calculates the right
-    // rows/cols. This avoids every CSS height-chain issue.
+    // termEl is position:absolute; inset:0 inside termWrapper (position:
+    // relative), so it always fills the wrapper. FitAddon reads
+    // termEl's offsetWidth/Height directly. scrollToBottom() after every
+    // fit ensures the cursor stays visible.
     const syncSize = () => {
-      const { width, height } = wrapper.getBoundingClientRect()
-      if (width === 0 || height === 0) return
-      termEl.style.width  = `${Math.floor(width)}px`
-      termEl.style.height = `${Math.floor(height)}px`
       fitAddon.fit()
+      terminal.scrollToBottom()
       if (shellIdRef.current) {
         window.api.terminal.resize(connId, shellIdRef.current, terminal.cols, terminal.rows)
       }
@@ -90,6 +88,7 @@ export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
     const unsubOutput = window.api.terminal.onOutput(({ shellId, data }: { shellId: string; data: string }) => {
       if (shellId !== shellIdRef.current) return
       terminal.write(data)
+      terminal.scrollToBottom()
       if (!hasChecked) {
         outputBuffer += data
         if (outputBuffer.includes('CLAUDE_FOUND')) {
@@ -124,9 +123,16 @@ export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
         await new Promise<void>((resolve) => setTimeout(resolve, 700))
         terminal.reset()
 
-        // reset() wipes xterm dimension state — re-sync after a layout pass.
+        // reset() wipes xterm's internal dimension state — re-fit and
+        // scroll to bottom so the cursor is immediately visible.
         await new Promise<void>((resolve) => {
-          requestAnimationFrame(() => { requestAnimationFrame(() => { syncSize(); resolve() }) })
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              fitAddon.fit()
+              terminal.scrollToBottom()
+              resolve()
+            })
+          })
         })
 
         setIsReady(true)
@@ -203,7 +209,7 @@ export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
       {/* Wrapper = the measurement box. syncSize() reads its pixel bounds
           and stamps them onto termRef. overflow:hidden clips visual excess. */}
       <div ref={wrapperRef} style={styles.termWrapper}>
-        <div ref={termRef} /* width/height set by syncSize() */ />
+        <div ref={termRef} style={styles.term} />
         {!isReady && (
           <div style={styles.loading}>
             <div style={styles.loadingDot} />
@@ -249,12 +255,21 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 500,
     cursor: 'pointer',
   },
-  // Wrapper fills remaining root height. overflow:hidden clips xterm.
-  // syncSize() reads this element's getBoundingClientRect() and sets the
-  // terminal div's pixel dimensions to match — no CSS ambiguity.
+  // Wrapper fills remaining root height. position:relative makes it the
+  // containing block for the absolutely-positioned termEl below.
+  // overflow:hidden clips any sub-pixel overhang from canvas sizing.
   termWrapper: {
     flex: 1,
     minHeight: 0,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  // termEl is absolutely positioned inside termWrapper so it always fills
+  // it exactly and is never in normal flow — xterm's canvas and viewport
+  // cannot push the surrounding layout regardless of content length.
+  term: {
+    position: 'absolute',
+    inset: 0,
     overflow: 'hidden',
   },
   loading: {
