@@ -69,6 +69,17 @@ export function TerminalView({ connId }: TerminalViewProps) {
     terminalRef.current = terminal
     fitAddonRef.current = fitAddon
 
+    // Ctrl+Shift+Up/Down → scroll scrollback without fighting mouse-tracking mode
+    terminal.attachCustomKeyEventHandler((e) => {
+      if (e.ctrlKey && e.shiftKey && e.type === 'keydown') {
+        if (e.key === 'ArrowUp')   { terminal.scrollLines(-5);  return false }
+        if (e.key === 'ArrowDown') { terminal.scrollLines(5);   return false }
+        if (e.key === 'Home')      { terminal.scrollToTop();    return false }
+        if (e.key === 'End')       { terminal.scrollToBottom(); return false }
+      }
+      return true
+    })
+
     // Create SSH shell
     const initShell = async () => {
       try {
@@ -127,6 +138,13 @@ export function TerminalView({ connId }: TerminalViewProps) {
 
   return (
     <div style={styles.container}>
+      {/* Scroll controls — work even when a program has mouse-tracking enabled */}
+      <div style={styles.scrollBar}>
+        <button style={styles.scrollBtn} title="Scroll up  (Ctrl+Shift+↑)"
+          onClick={() => terminalRef.current?.scrollLines(-20)}>↑</button>
+        <button style={styles.scrollBtn} title="Scroll to bottom  (Ctrl+Shift+End)"
+          onClick={() => terminalRef.current?.scrollToBottom()}>↓</button>
+      </div>
       <div ref={termRef} style={styles.terminal} />
       {!isReady && (
         <div style={styles.loading}>
@@ -140,11 +158,32 @@ export function TerminalView({ connId }: TerminalViewProps) {
 const styles: Record<string, React.CSSProperties> = {
   container: {
     height: '100%',
+    display: 'flex',
+    flexDirection: 'column',
     position: 'relative',
     background: '#1a1b2e',
   },
+  scrollBar: {
+    display: 'flex',
+    gap: '4px',
+    padding: '4px 8px',
+    borderBottom: '1px solid var(--border)',
+    background: 'var(--bg-secondary)',
+    flexShrink: 0,
+  },
+  scrollBtn: {
+    padding: '2px 8px',
+    background: 'var(--bg-tertiary)',
+    color: 'var(--text-secondary)',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--radius-sm)',
+    fontSize: '13px',
+    lineHeight: '18px',
+    cursor: 'pointer',
+  },
   terminal: {
-    height: '100%',
+    flex: 1,
+    minHeight: 0,
     overflow: 'hidden',
   },
   loading: {

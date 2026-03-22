@@ -193,7 +193,12 @@ input:focus, textarea:focus, select:focus {
 
 .tab-content {
   animation: fadeIn 150ms ease forwards;
-  height: 100%;
+  /* Use flex instead of height:100% so the percentage resolves correctly
+     against a flex-determined parent height (avoids the container growing
+     with content instead of staying bounded). */
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 /* ─── Tooltip ────────────────────────────────────── */

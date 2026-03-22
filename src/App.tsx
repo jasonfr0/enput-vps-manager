@@ -231,8 +231,11 @@ const styles: Record<string, React.CSSProperties> = {
   },
   content: {
     flex: 1,
+    minHeight: 0,          // allow flex item to shrink below content size
     overflow: 'hidden',
     position: 'relative',
+    display: 'flex',
+    flexDirection: 'column',
   },
   emptyState: {
     display: 'flex',

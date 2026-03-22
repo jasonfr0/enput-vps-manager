@@ -70,6 +70,17 @@ export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
     terminalRef.current = terminal
     fitAddonRef.current = fitAddon
 
+    // Ctrl+Shift+Up/Down → scroll scrollback without fighting mouse-tracking mode
+    terminal.attachCustomKeyEventHandler((e) => {
+      if (e.ctrlKey && e.shiftKey && e.type === 'keydown') {
+        if (e.key === 'ArrowUp')   { terminal.scrollLines(-5);  return false }
+        if (e.key === 'ArrowDown') { terminal.scrollLines(5);   return false }
+        if (e.key === 'Home')      { terminal.scrollToTop();    return false }
+        if (e.key === 'End')       { terminal.scrollToBottom(); return false }
+      }
+      return true
+    })
+
     // Handle user input
     terminal.onData((data) => {
       if (shellIdRef.current) {
@@ -214,6 +225,17 @@ export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
               Launch claude
             </button>
           )}
+          {/* Scroll controls — work even when Claude Code has mouse-tracking enabled */}
+          <button
+            style={styles.scrollBtn}
+            title="Scroll up (or use mouse wheel)"
+            onClick={() => terminalRef.current?.scrollLines(-20)}
+          >↑</button>
+          <button
+            style={styles.scrollBtn}
+            title="Scroll to bottom"
+            onClick={() => terminalRef.current?.scrollToBottom()}
+          >↓</button>
         </div>
       </div>
 
@@ -277,6 +299,16 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 'var(--radius-sm)',
     fontSize: '11px',
     fontWeight: 500,
+    cursor: 'pointer',
+  },
+  scrollBtn: {
+    padding: '2px 8px',
+    background: 'var(--bg-tertiary)',
+    color: 'var(--text-secondary)',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--radius-sm)',
+    fontSize: '13px',
+    lineHeight: '18px',
     cursor: 'pointer',
   },
   // Wrapper must be overflow:hidden + minHeight:0 so xterm's inner
