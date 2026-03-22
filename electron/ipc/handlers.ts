@@ -1,8 +1,11 @@
-import { ipcMain, dialog, BrowserWindow } from 'electron'
+import { ipcMain, dialog, BrowserWindow, Notification } from 'electron'
 import { SSHConnectionManager } from '../managers/SSHConnectionManager'
 import { SFTPManager } from '../managers/SFTPManager'
 import { CredentialManager } from '../managers/CredentialManager'
 import { ResourceMonitor } from '../managers/ResourceMonitor'
+import { ClaudeManager } from '../managers/ClaudeManager'
+import { SSHKeyManager } from '../managers/SSHKeyManager'
+import { UpdateManager } from '../managers/UpdateManager'
 import { IPC_CHANNELS, ServerConfig } from '../types'
 import log from 'electron-log'
 
@@ -11,7 +14,10 @@ export function registerIpcHandlers(
   sshManager: SSHConnectionManager,
   sftpManager: SFTPManager,
   credentialManager: CredentialManager,
-  resourceMonitor: ResourceMonitor
+  resourceMonitor: ResourceMonitor,
+  claudeManager: ClaudeManager,
+  sshKeyManager: SSHKeyManager,
+  updateManager: UpdateManager
 ): void {
   // --- SSH Handlers ---
 
@@ -148,6 +154,12 @@ export function registerIpcHandlers(
     await sftpManager.mkdir(connId, client, path)
   })
 
+  ipcMain.handle(IPC_CHANNELS.SFTP_DELETE_DIR, async (_, { connId, path }) => {
+    const client = sshManager.getClient(connId)
+    if (!client) throw new Error(`No connection: ${connId}`)
+    await sftpManager.deleteDirectory(connId, client, path)
+  })
+
   // Forward transfer progress to renderer
   sftpManager.on('transferProgress', ({ connId, progress }) => {
     mainWindow.webContents.send(IPC_CHANNELS.SFTP_TRANSFER_PROGRESS, {
@@ -176,6 +188,28 @@ export function registerIpcHandlers(
   })
 
   // --- Claude Handlers ---
+
+  ipcMain.handle(
+    IPC_CHANNELS.CLAUDE_CHAT,
+    async (_, { connId, messages }) => {
+      return claudeManager.chat(messages)
+    }
+  )
+
+  ipcMain.handle('claude:setApiKey', async (_, { key }) => {
+    claudeManager.setApiKey(key)
+    // Persist the key in settings
+    credentialManager.setSetting('claude_api_key', key)
+  })
+
+  ipcMain.handle('claude:getApiKey', async () => {
+    // Try to load from settings if not already set
+    if (!claudeManager.getApiKey()) {
+      const saved = credentialManager.getSetting('claude_api_key', null)
+      if (saved) claudeManager.setApiKey(saved)
+    }
+    return claudeManager.getApiKey() ? true : false
+  })
 
   ipcMain.handle(
     IPC_CHANNELS.CLAUDE_EXECUTE,
@@ -234,6 +268,82 @@ export function registerIpcHandlers(
   ipcMain.handle('dialog:saveFile', async (_, options) => {
     const result = await dialog.showSaveDialog(mainWindow, options)
     return result
+  })
+
+  // --- Generic SSH exec ---
+
+  ipcMain.handle(IPC_CHANNELS.SSH_EXEC, async (_, { connId, command }) => {
+    const client = sshManager.getClient(connId)
+    if (!client) throw new Error(`No connection: ${connId}`)
+    return sshManager.executeCommand(connId, command)
+  })
+
+  // --- SSH Key Management ---
+
+  ipcMain.handle(IPC_CHANNELS.SSHKEY_LIST_LOCAL, async () => {
+    return sshKeyManager.listLocalKeys()
+  })
+
+  ipcMain.handle(IPC_CHANNELS.SSHKEY_GENERATE, async (_, { name, type, passphrase, comment }) => {
+    return sshKeyManager.generateKey(name, type, passphrase ?? '', comment ?? '')
+  })
+
+  ipcMain.handle(IPC_CHANNELS.SSHKEY_DELETE, async (_, { name }) => {
+    sshKeyManager.deleteKey(name)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.SSHKEY_GET_PUBLIC, async (_, { name }) => {
+    return sshKeyManager.getPublicKey(name)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.SSHKEY_LIST_AUTHORIZED, async (_, { connId }) => {
+    const client = sshManager.getClient(connId)
+    if (!client) throw new Error(`No connection: ${connId}`)
+    return sshKeyManager.listAuthorizedKeys(client)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.SSHKEY_ADD_AUTHORIZED, async (_, { connId, publicKeyLine }) => {
+    const client = sshManager.getClient(connId)
+    if (!client) throw new Error(`No connection: ${connId}`)
+    await sshKeyManager.addAuthorizedKey(client, publicKeyLine)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.SSHKEY_REMOVE_AUTHORIZED, async (_, { connId, rawLine }) => {
+    const client = sshManager.getClient(connId)
+    if (!client) throw new Error(`No connection: ${connId}`)
+    await sshKeyManager.removeAuthorizedKey(client, rawLine)
+  })
+
+  // --- Native OS Notification ---
+  // Only fires a system notification when the window is not focused,
+  // so it doesn't duplicate the in-app toast that's already visible.
+  ipcMain.on('notify:send', (_, { title, body }: { title: string; body?: string }) => {
+    if (mainWindow && !mainWindow.isFocused() && Notification.isSupported()) {
+      new Notification({ title, body: body ?? '' }).show()
+    }
+  })
+
+  // --- Auto-Updater ---
+
+  // Query current state (e.g. on renderer startup to rehydrate)
+  ipcMain.handle(IPC_CHANNELS.UPDATE_GET, () => {
+    return updateManager.getState()
+  })
+
+  // Manual check triggered from renderer (e.g. "Check for updates" button)
+  ipcMain.handle(IPC_CHANNELS.UPDATE_CHECK, async () => {
+    await updateManager.checkForUpdates()
+    return updateManager.getState()
+  })
+
+  // User clicked "Download" in the update banner
+  ipcMain.handle(IPC_CHANNELS.UPDATE_DOWNLOAD, async () => {
+    await updateManager.downloadUpdate()
+  })
+
+  // User clicked "Restart & Install"
+  ipcMain.on(IPC_CHANNELS.UPDATE_INSTALL, () => {
+    updateManager.quitAndInstall()
   })
 
   log.info('IPC handlers registered')

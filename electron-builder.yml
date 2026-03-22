@@ -1,34 +1,209 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Enput VPS Manager — electron-builder configuration
+# Code signing guide: see docs/CODE_SIGNING.md
+# ─────────────────────────────────────────────────────────────────────────────
+
 appId: com.enput.vps-manager
 productName: Enput VPS Manager
+copyright: Copyright © 2024 Enput
+
+# ── Output directories ───────────────────────────────────────────────────────
 directories:
   output: release
   buildResources: public
 
+# ── Files to bundle ─────────────────────────────────────────────────────────
 files:
   - dist/**/*
   - package.json
 
-win:
-  target:
-    - nsis
-  artifactName: ${productName}-${version}-Setup.${ext}
-  icon: public/icons/icon.ico
+# ── Metadata (shows in installers / About dialogs) ──────────────────────────
+extraMetadata:
+  description: A GUI desktop application for managing VPS servers via SSH/SFTP with Claude Code integration
 
+# ── Auto-updater publish target ─────────────────────────────────────────────
+# electron-updater reads this to know where to fetch latest.yml / update files.
+# Set GITHUB_TOKEN env var (or GH_TOKEN) when running electron-builder so it
+# can upload assets to the release. The token needs repo write scope.
+#
+# Replace 'your-github-org' with your actual GitHub org or username.
+publish:
+  provider: github
+  owner: your-github-org
+  repo: enput-vps-manager
+  releaseType: release   # 'draft' | 'prerelease' | 'release'
+
+# ═════════════════════════════════════════════════════════════════════════════
+# WINDOWS
+# ═════════════════════════════════════════════════════════════════════════════
+win:
+  icon: public/icons/icon.ico
+  target:
+    - target: nsis
+      arch:
+        - x64
+        - arm64
+    - target: portable
+      arch:
+        - x64
+
+  # ── Code signing ──────────────────────────────────────────────────────────
+  # Set the following environment variables (never commit them):
+  #   WIN_CSC_LINK          — path to .pfx file, or base64-encoded .pfx, or
+  #                           "file://C:/path/to/cert.pfx"
+  #   WIN_CSC_KEY_PASSWORD  — password for the .pfx
+  #
+  # For Azure Trusted Signing (recommended for EV certs without HSM):
+  #   AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET,
+  #   AZURE_CODE_SIGNING_ACCOUNT_NAME, AZURE_CODE_SIGNING_ENDPOINT,
+  #   AZURE_CODE_SIGNING_CERTIFICATE_PROFILE_NAME
+  #
+  # electron-builder reads WIN_CSC_LINK / WIN_CSC_KEY_PASSWORD automatically.
+  # Leave commented out to build without signing (shows SmartScreen warning).
+  #
+  # certificateSubjectName: "Enput"
+  # signingHashAlgorithms:
+  #   - sha256
+  # timeStampServer: http://timestamp.sectigo.com
+
+  # Signing options (timestamp server used when WIN_CSC_LINK is set)
+  signtoolOptions:
+    signingHashAlgorithms:
+      - sha256
+    timeStampServer: http://timestamp.sectigo.com
+
+# ── NSIS installer options ───────────────────────────────────────────────────
 nsis:
   oneClick: false
+  allowElevation: true
   allowToChangeInstallationDirectory: true
+  installerIcon: public/icons/icon.ico
+  uninstallerIcon: public/icons/icon.ico
+  installerHeaderIcon: public/icons/icon.ico
   createDesktopShortcut: true
   createStartMenuShortcut: true
   shortcutName: Enput VPS Manager
+  menuCategory: Development
+  # Installer language (English)
+  language: 1033
+  # Include VC++ redistributables if needed
+  # include: build/nsis/installer.nsh
+  artifactName: ${productName}-${version}-Setup-${arch}.${ext}
 
+# ── Portable (no-install) ────────────────────────────────────────────────────
+portable:
+  artifactName: ${productName}-${version}-Portable-${arch}.${ext}
+
+# ═════════════════════════════════════════════════════════════════════════════
+# MACOS
+# ═════════════════════════════════════════════════════════════════════════════
 mac:
-  target:
-    - dmg
-    - zip
   icon: public/icons/icon.icns
-
-linux:
   target:
-    - AppImage
-    - deb
+    - target: dmg
+      arch:
+        - x64
+        - arm64
+    - target: zip
+      arch:
+        - x64
+        - arm64
+
+  # ── Code signing ──────────────────────────────────────────────────────────
+  # Requires an Apple Developer account ($99/year) and:
+  #   CSC_LINK              — base64-encoded .p12 certificate
+  #                           (export from Keychain: "Developer ID Application")
+  #   CSC_KEY_PASSWORD      — password for the .p12
+  #
+  # Notarization (required for distribution outside App Store):
+  #   APPLE_ID              — your Apple ID email
+  #   APPLE_APP_SPECIFIC_PASSWORD — app-specific password from appleid.apple.com
+  #   APPLE_TEAM_ID         — 10-char team ID from developer.apple.com
+  #
+  # electron-builder reads these env vars automatically when present.
+  #
+  category: public.app-category.developer-tools
+
+  # Hardened runtime is required for notarization
+  hardenedRuntime: true
+  gatekeeperAssess: false
+
+  # Entitlements grant capabilities needed by Electron under hardened runtime
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+
+  # Notarize after signing (requires APPLE_ID + APPLE_APP_SPECIFIC_PASSWORD + APPLE_TEAM_ID)
+  notarize: true
+
+  artifactName: ${productName}-${version}-${arch}.${ext}
+
+# ── DMG options ──────────────────────────────────────────────────────────────
+dmg:
+  title: ${productName} ${version}
+  icon: public/icons/icon.icns
+  iconSize: 100
+  window:
+    width: 540
+    height: 380
+  contents:
+    - x: 140
+      y: 190
+      type: file
+    - x: 400
+      y: 190
+      type: link
+      path: /Applications
+  artifactName: ${productName}-${version}-${arch}.${ext}
+
+# ═════════════════════════════════════════════════════════════════════════════
+# LINUX
+# ═════════════════════════════════════════════════════════════════════════════
+linux:
   icon: public/icons
+  target:
+    - target: AppImage
+      arch:
+        - x64
+        - arm64
+    - target: deb
+      arch:
+        - x64
+    - target: rpm
+      arch:
+        - x64
+
+  category: Development
+  description: GUI desktop application for managing VPS servers via SSH/SFTP
+  maintainer: Enput <support@enput.com>
+
+  # Desktop entry metadata
+  desktop:
+    entry:
+      Name: Enput VPS Manager
+      Comment: Manage your VPS servers via SSH/SFTP with Claude Code integration
+      Keywords: ssh;sftp;vps;server;terminal;
+
+  artifactName: ${productName}-${version}-${arch}.${ext}
+
+# ── AppImage ─────────────────────────────────────────────────────────────────
+appImage:
+  artifactName: ${productName}-${version}-${arch}.AppImage
+
+# ── Debian package ───────────────────────────────────────────────────────────
+deb:
+  depends:
+    - libgtk-3-0
+    - libnotify4
+    - libnss3
+    - libxss1
+    - libxtst6
+    - xdg-utils
+    - libatspi2.0-0
+    - libdrm2
+    - libgbm1
+    - libxcb-dri3-0
+  artifactName: ${productName}_${version}_${arch}.${ext}
+
+# ── RPM package ──────────────────────────────────────────────────────────────
+rpm:
+  artifactName: ${productName}-${version}.${arch}.${ext}

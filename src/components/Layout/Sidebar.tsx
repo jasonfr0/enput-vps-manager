@@ -6,22 +6,20 @@ interface SidebarProps {
   activeTab: ActiveTab
   onTabChange: (tab: ActiveTab) => void
   onAddServer: () => void
+  onOpenSettings: () => void
 }
 
-const tabs: { id: ActiveTab; label: string; icon: string }[] = [
-  { id: 'terminal', label: 'Terminal', icon: '>_' },
-  { id: 'files', label: 'Files', icon: '\u{1F4C1}' },
-  { id: 'editor', label: 'Editor', icon: '\u{1F4DD}' },
-  { id: 'chat', label: 'Claude', icon: '\u{1F916}' },
-  { id: 'monitor', label: 'Monitor', icon: '\u{1F4CA}' },
+const tabs: { id: ActiveTab; label: string; icon: string; shortcut: string }[] = [
+  { id: 'terminal',   label: 'Terminal',    icon: '>_', shortcut: '⌃1' },
+  { id: 'files',      label: 'Files',       icon: '📁', shortcut: '⌃2' },
+  { id: 'editor',     label: 'Editor',      icon: '📝', shortcut: '⌃3' },
+  { id: 'chat',       label: 'Claude Chat', icon: '🤖', shortcut: '⌃4' },
+  { id: 'claude-cli', label: 'Claude Code', icon: '✨', shortcut: '⌃5' },
+  { id: 'monitor',    label: 'Monitor',     icon: '📊', shortcut: '⌃6' },
 ]
 
-export function Sidebar({ activeTab, onTabChange, onAddServer }: SidebarProps) {
-  const {
-    servers,
-    activeServerId,
-    connectionStatus,
-  } = useConnectionStore()
+export function Sidebar({ activeTab, onTabChange, onAddServer, onOpenSettings }: SidebarProps) {
+  const { servers, activeServerId, connectionStatus } = useConnectionStore()
 
   const handleConnect = async (serverId: string) => {
     try {
@@ -40,39 +38,50 @@ export function Sidebar({ activeTab, onTabChange, onAddServer }: SidebarProps) {
     }
   }
 
+  const handleDeleteServer = async (serverId: string) => {
+    if (!confirm('Delete this server?')) return
+    if (activeServerId === serverId) await handleDisconnect()
+    try {
+      await window.api.servers.delete(serverId)
+      useConnectionStore.getState().removeServer(serverId)
+    } catch (err: any) {
+      console.error('Failed to delete server:', err)
+    }
+  }
+
+  const isConnected = connectionStatus === 'connected'
+  const isConnecting = connectionStatus === 'connecting'
+
   return (
     <div style={styles.sidebar}>
-      {/* Logo area */}
+      {/* Logo */}
       <div style={styles.logo}>
-        <span style={styles.logoIcon}>&#9889;</span>
+        <span style={styles.logoIcon}>⚡</span>
         <span style={styles.logoText}>Enput VPS</span>
       </div>
 
-      {/* Navigation tabs */}
-      <div style={styles.nav}>
+      {/* Navigation */}
+      <nav style={styles.nav}>
         <div style={styles.sectionLabel}>Navigation</div>
         {tabs.map((tab) => (
           <button
             key={tab.id}
-            style={{
-              ...styles.navItem,
-              ...(activeTab === tab.id ? styles.navItemActive : {}),
-            }}
+            className={`nav-item${activeTab === tab.id ? ' active' : ''}`}
             onClick={() => onTabChange(tab.id)}
+            data-tooltip={`${tab.label} (Ctrl+${tab.shortcut.replace('⌃', '')})`}
           >
             <span style={styles.navIcon}>{tab.icon}</span>
-            <span>{tab.label}</span>
+            <span style={styles.navLabel}>{tab.label}</span>
+            <span className="shortcut-badge">{tab.shortcut}</span>
           </button>
         ))}
-      </div>
+      </nav>
 
-      {/* Server list */}
+      {/* Servers */}
       <div style={styles.servers}>
         <div style={styles.sectionHeader}>
           <span style={styles.sectionLabel}>Servers</span>
-          <button style={styles.addBtn} onClick={onAddServer}>
-            +
-          </button>
+          <button style={styles.addBtn} onClick={onAddServer} title="Add server">+</button>
         </div>
 
         <div style={styles.serverList}>
@@ -81,25 +90,23 @@ export function Sidebar({ activeTab, onTabChange, onAddServer }: SidebarProps) {
           )}
           {servers.map((server) => {
             const isActive = activeServerId === server.id
-            const isConnecting =
-              connectionStatus === 'connecting' && !isActive
 
             return (
               <div
                 key={server.id}
-                style={{
-                  ...styles.serverItem,
-                  ...(isActive ? styles.serverItemActive : {}),
-                }}
+                className={`server-item${isActive ? ' active' : ''}`}
               >
                 <div style={styles.serverInfo}>
                   <div
                     style={{
                       ...styles.statusDot,
-                      background: isActive
+                      background: isActive && isConnected
                         ? 'var(--success)'
+                        : isActive && isConnecting
+                        ? 'var(--warning)'
                         : 'var(--text-muted)',
                     }}
+                    className={isActive && isConnecting ? 'status-dot-connecting' : ''}
                   />
                   <div style={styles.serverDetails}>
                     <div style={styles.serverName}>{server.name}</div>
@@ -107,27 +114,50 @@ export function Sidebar({ activeTab, onTabChange, onAddServer }: SidebarProps) {
                       {server.username}@{server.host}
                     </div>
                   </div>
+                  <button
+                    style={styles.deleteBtn}
+                    onClick={(e) => { e.stopPropagation(); handleDeleteServer(server.id) }}
+                    title="Delete server"
+                  >
+                    ×
+                  </button>
                 </div>
-                {isActive ? (
-                  <button
-                    style={styles.disconnectBtn}
-                    onClick={handleDisconnect}
-                  >
-                    Disconnect
-                  </button>
-                ) : (
-                  <button
-                    style={styles.connectBtn}
-                    onClick={() => handleConnect(server.id)}
-                    disabled={isConnecting}
-                  >
-                    {isConnecting ? '...' : 'Connect'}
-                  </button>
-                )}
+
+                <div style={styles.serverActions}>
+                  {isActive && isConnected ? (
+                    <button style={styles.disconnectBtn} onClick={handleDisconnect}>
+                      Disconnect
+                    </button>
+                  ) : isActive && isConnecting ? (
+                    <button style={{ ...styles.connectBtn, opacity: 0.6 }} disabled>
+                      Connecting...
+                    </button>
+                  ) : (
+                    <button
+                      style={styles.connectBtn}
+                      onClick={() => handleConnect(server.id)}
+                    >
+                      Connect
+                    </button>
+                  )}
+                </div>
               </div>
             )
           })}
         </div>
+      </div>
+
+      {/* Settings button */}
+      <div style={styles.settingsRow}>
+        <button
+          className={`nav-item${activeTab === 'settings' ? ' active' : ''}`}
+          onClick={onOpenSettings}
+          style={{ margin: '0 0 4px 0' }}
+        >
+          <span style={styles.navIcon}>⚙️</span>
+          <span style={styles.navLabel}>Settings</span>
+          <span className="shortcut-badge">⌃,</span>
+        </button>
       </div>
 
       {/* Status bar */}
@@ -136,23 +166,18 @@ export function Sidebar({ activeTab, onTabChange, onAddServer }: SidebarProps) {
           style={{
             ...styles.statusIndicator,
             background:
-              connectionStatus === 'connected'
-                ? 'var(--success)'
-                : connectionStatus === 'connecting'
-                ? 'var(--warning)'
-                : connectionStatus === 'error'
-                ? 'var(--error)'
-                : 'var(--text-muted)',
+              isConnected  ? 'var(--success)' :
+              isConnecting ? 'var(--warning)' :
+              connectionStatus === 'error' ? 'var(--error)' :
+              'var(--text-muted)',
           }}
+          className={isConnecting ? 'status-dot-connecting' : ''}
         />
         <span style={styles.statusText}>
-          {connectionStatus === 'connected'
-            ? 'Connected'
-            : connectionStatus === 'connecting'
-            ? 'Connecting...'
-            : connectionStatus === 'error'
-            ? 'Error'
-            : 'Disconnected'}
+          {isConnected  ? 'Connected' :
+           isConnecting ? 'Connecting...' :
+           connectionStatus === 'error' ? 'Connection error' :
+           'Disconnected'}
         </span>
       </div>
     </div>
@@ -173,72 +198,59 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
-    padding: '16px',
+    padding: '14px 16px',
     borderBottom: '1px solid var(--border)',
   },
-  logoIcon: {
-    fontSize: '20px',
-  },
+  logoIcon: { fontSize: '18px' },
   logoText: {
-    fontSize: '16px',
+    fontSize: '15px',
     fontWeight: 700,
     color: 'var(--text-primary)',
+    letterSpacing: '-0.3px',
   },
   nav: {
-    padding: '12px 8px',
+    padding: '10px 8px',
     borderBottom: '1px solid var(--border)',
   },
   sectionLabel: {
     fontSize: '10px',
     fontWeight: 600,
     textTransform: 'uppercase' as const,
-    letterSpacing: '0.5px',
+    letterSpacing: '0.6px',
     color: 'var(--text-muted)',
-    padding: '0 8px 8px',
-  },
-  navItem: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '10px',
-    width: '100%',
-    padding: '8px 12px',
-    border: 'none',
-    borderRadius: 'var(--radius-sm)',
-    background: 'transparent',
-    color: 'var(--text-secondary)',
-    fontSize: '13px',
-    cursor: 'pointer',
-    textAlign: 'left' as const,
-  },
-  navItemActive: {
-    background: 'var(--accent-dim)',
-    color: 'var(--accent)',
+    padding: '0 8px 6px',
   },
   navIcon: {
-    width: '20px',
+    width: '18px',
     textAlign: 'center' as const,
-    fontSize: '14px',
+    fontSize: '13px',
+    flexShrink: 0,
+  },
+  navLabel: {
+    flex: 1,
+    textAlign: 'left' as const,
   },
   servers: {
     flex: 1,
     overflow: 'auto',
-    padding: '12px 8px',
+    padding: '10px 8px',
   },
   sectionHeader: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingRight: '8px',
+    paddingRight: '4px',
     marginBottom: '4px',
   },
   addBtn: {
-    width: '22px',
-    height: '22px',
+    width: '20px',
+    height: '20px',
     border: '1px solid var(--border)',
     borderRadius: 'var(--radius-sm)',
     background: 'transparent',
     color: 'var(--text-secondary)',
-    fontSize: '14px',
+    fontSize: '15px',
+    lineHeight: 1,
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
@@ -247,7 +259,7 @@ const styles: Record<string, React.CSSProperties> = {
   serverList: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '4px',
+    gap: '2px',
   },
   emptyServers: {
     padding: '16px 8px',
@@ -255,28 +267,20 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '12px',
     textAlign: 'center' as const,
   },
-  serverItem: {
-    padding: '8px',
-    borderRadius: 'var(--radius-sm)',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '6px',
-  },
-  serverItemActive: {
-    background: 'var(--bg-tertiary)',
-  },
   serverInfo: {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
   },
   statusDot: {
-    width: '8px',
-    height: '8px',
+    width: '7px',
+    height: '7px',
     borderRadius: '50%',
     flexShrink: 0,
+    transition: 'background 0.3s',
   },
   serverDetails: {
+    flex: 1,
     overflow: 'hidden',
   },
   serverName: {
@@ -288,44 +292,73 @@ const styles: Record<string, React.CSSProperties> = {
     whiteSpace: 'nowrap' as const,
   },
   serverHost: {
-    fontSize: '11px',
+    fontSize: '10px',
     color: 'var(--text-muted)',
     fontFamily: 'var(--font-mono)',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap' as const,
+  },
+  serverActions: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+  },
+  deleteBtn: {
+    width: '16px',
+    height: '16px',
+    border: 'none',
+    borderRadius: '50%',
+    background: 'transparent',
+    color: 'var(--text-muted)',
+    fontSize: '14px',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    lineHeight: 1,
+    opacity: 0.5,
   },
   connectBtn: {
-    padding: '4px 10px',
+    padding: '3px 10px',
     border: '1px solid var(--accent)',
     borderRadius: 'var(--radius-sm)',
     background: 'transparent',
     color: 'var(--accent)',
     fontSize: '11px',
+    fontWeight: 500,
     cursor: 'pointer',
-    alignSelf: 'flex-end',
   },
   disconnectBtn: {
-    padding: '4px 10px',
-    border: '1px solid var(--error)',
+    padding: '3px 10px',
+    border: '1px solid var(--border)',
     borderRadius: 'var(--radius-sm)',
     background: 'transparent',
-    color: 'var(--error)',
+    color: 'var(--text-muted)',
     fontSize: '11px',
     cursor: 'pointer',
-    alignSelf: 'flex-end',
+  },
+  settingsRow: {
+    padding: '4px 8px 0',
+    borderTop: '1px solid var(--border)',
   },
   statusBar: {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
-    padding: '10px 16px',
+    padding: '10px 14px',
     borderTop: '1px solid var(--border)',
     fontSize: '12px',
   },
   statusIndicator: {
-    width: '8px',
-    height: '8px',
+    width: '7px',
+    height: '7px',
     borderRadius: '50%',
+    flexShrink: 0,
+    transition: 'background 0.3s',
   },
   statusText: {
     color: 'var(--text-secondary)',
+    fontSize: '12px',
   },
 }

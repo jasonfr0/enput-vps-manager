@@ -4,6 +4,9 @@ import { SSHConnectionManager } from './managers/SSHConnectionManager'
 import { SFTPManager } from './managers/SFTPManager'
 import { CredentialManager } from './managers/CredentialManager'
 import { ResourceMonitor } from './managers/ResourceMonitor'
+import { ClaudeManager } from './managers/ClaudeManager'
+import { SSHKeyManager } from './managers/SSHKeyManager'
+import { UpdateManager } from './managers/UpdateManager'
 import { registerIpcHandlers } from './ipc/handlers'
 import log from 'electron-log'
 
@@ -16,6 +19,16 @@ const sshManager = new SSHConnectionManager()
 const sftpManager = new SFTPManager()
 const credentialManager = new CredentialManager()
 const resourceMonitor = new ResourceMonitor()
+const claudeManager = new ClaudeManager()
+const sshKeyManager = new SSHKeyManager()
+const updateManager = new UpdateManager()
+
+// Load saved API key
+const savedApiKey = credentialManager.getSetting<string | null>('claude_api_key', null)
+if (savedApiKey) {
+  claudeManager.setApiKey(savedApiKey)
+  log.info('Claude API key loaded from settings')
+}
 
 let mainWindow: BrowserWindow | null = null
 
@@ -49,25 +62,35 @@ function createWindow(): void {
     return { action: 'deny' }
   })
 
+  // Give UpdateManager a reference to the window so it can push events
+  updateManager.init(mainWindow)
+
   // Register IPC handlers
   registerIpcHandlers(
     mainWindow,
     sshManager,
     sftpManager,
     credentialManager,
-    resourceMonitor
+    resourceMonitor,
+    claudeManager,
+    sshKeyManager,
+    updateManager
   )
 
   // Load the app
   if (process.env.NODE_ENV === 'development') {
     mainWindow.loadURL('http://localhost:5173')
-    mainWindow.webContents.openDevTools()
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
 
   mainWindow.on('closed', () => {
     mainWindow = null
+  })
+
+  // Start auto-update checks after the window is ready
+  mainWindow.once('ready-to-show', () => {
+    updateManager.checkOnStartup()
   })
 
   log.info('Main window created')
@@ -88,6 +111,7 @@ app.on('window-all-closed', () => {
   // Cleanup
   sshManager.disconnectAll()
   resourceMonitor.stopAll()
+  updateManager.destroy()
 
   if (process.platform !== 'darwin') {
     app.quit()
@@ -97,4 +121,5 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
   sshManager.disconnectAll()
   resourceMonitor.stopAll()
+  updateManager.destroy()
 })

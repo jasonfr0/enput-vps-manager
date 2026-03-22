@@ -1,5 +1,6 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useRef } from 'react'
 import { useMonitorStore } from '../../context/useMonitorStore'
+import { notify } from '../../context/useNotificationStore'
 import {
   LineChart,
   Line,
@@ -16,19 +17,52 @@ interface ResourceMonitorProps {
   connId: string
 }
 
+// Thresholds that trigger a warning notification
+const THRESHOLDS = { cpu: 90, memory: 90, disk: 95 }
+// Minimum gap between repeated alerts for the same resource (ms)
+const ALERT_COOLDOWN = 60_000
+
 export function ResourceMonitor({ connId }: ResourceMonitorProps) {
   const { metrics, latestMetrics, addMetrics, clearMetrics } =
     useMonitorStore()
 
+  // Track when each alert was last fired so we don't spam every poll interval
+  const lastAlerted = useRef<Record<string, number>>({})
+
+  const maybeAlert = (key: string, value: number, threshold: number, label: string) => {
+    if (value < threshold) return
+    const now = Date.now()
+    if ((lastAlerted.current[key] ?? 0) + ALERT_COOLDOWN > now) return
+    lastAlerted.current[key] = now
+    notify.warning(
+      `High ${label}`,
+      `${label} is at ${Math.round(value)}% — consider investigating`
+    )
+    ;(window.api as any).notify?.send(
+      'Enput VPS Manager',
+      `High ${label}: ${Math.round(value)}%`
+    )
+  }
+
   useEffect(() => {
     clearMetrics()
+    lastAlerted.current = {}
 
-    // Start monitoring
     window.api.monitor.start(connId)
 
-    // Listen for updates
-    const unsub = window.api.monitor.onUpdate(({ metrics: newMetrics }) => {
+    const unsub = window.api.monitor.onUpdate(({ metrics: newMetrics }: any) => {
       addMetrics(newMetrics)
+
+      const memPct = newMetrics.memoryTotal > 0
+        ? (newMetrics.memoryUsed / newMetrics.memoryTotal) * 100
+        : 0
+      const diskPct = newMetrics.diskTotal > 0
+        ? (newMetrics.diskUsed / newMetrics.diskTotal) * 100
+        : 0
+
+      maybeAlert('cpu',    newMetrics.cpu, THRESHOLDS.cpu,    'CPU')
+      maybeAlert('memory', memPct,         THRESHOLDS.memory, 'Memory')
+      maybeAlert('disk',   diskPct,        THRESHOLDS.disk,   'Disk')
     })
 
     return () => {

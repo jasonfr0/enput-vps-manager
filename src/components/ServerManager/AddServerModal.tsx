@@ -31,14 +31,21 @@ export function AddServerModal({ onClose }: AddServerModalProps) {
   }
 
   const handleTest = async () => {
+    if (!host || !username) {
+      setError('Host and username are required to test')
+      return
+    }
+
     setIsTesting(true)
     setError('')
     setTestResult('')
+
+    let savedServer: any = null
     try {
       // Save temporarily, then connect
       const config = {
-        id: `test_${Date.now()}`,
-        name: name || 'Test',
+        id: '',
+        name: name || 'Test Connection',
         host,
         port: parseInt(port),
         username,
@@ -48,19 +55,25 @@ export function AddServerModal({ onClose }: AddServerModalProps) {
         passphrase: passphrase || undefined,
       }
 
-      await window.api.servers.add(config)
-      const state = await window.api.ssh.connect(config.id)
+      // Use the returned server (which has the real ID assigned by the backend)
+      savedServer = await window.api.servers.add(config)
+      const state = await window.api.ssh.connect(savedServer.id)
 
       if (state.status === 'connected') {
         setTestResult('Connection successful!')
         await window.api.ssh.disconnect(state.id)
       }
-
-      // Remove test server
-      await window.api.servers.delete(config.id)
     } catch (err: any) {
       setError(`Connection failed: ${err.message}`)
     } finally {
+      // Always clean up the temp server
+      if (savedServer?.id) {
+        try {
+          await window.api.servers.delete(savedServer.id)
+        } catch {
+          // ignore cleanup errors
+        }
+      }
       setIsTesting(false)
     }
   }

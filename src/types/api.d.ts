@@ -1,10 +1,5 @@
 // Type definitions for the window.api exposed by preload
 export interface ElectronAPI {
-  ssh: {
-    connect: (serverId: string) => Promise<any>
-    disconnect: (connId: string) => Promise<void>
-    onStatusChange: (callback: (state: any) => void) => () => void
-  }
   terminal: {
     create: (connId: string, cols: number, rows: number) => Promise<{ shellId: string }>
     write: (connId: string, shellId: string, data: string) => void
@@ -46,6 +41,31 @@ export interface ElectronAPI {
   dialog: {
     openFile: (options?: any) => Promise<any>
     saveFile: (options?: any) => Promise<any>
+  }
+  notify: {
+    send: (title: string, body?: string) => void
+  }
+  sshKeys: {
+    listLocal: () => Promise<any[]>
+    generate: (name: string, type: 'ed25519' | 'rsa', passphrase: string, comment: string) => Promise<any>
+    delete: (name: string) => Promise<void>
+    getPublic: (name: string) => Promise<string>
+    listAuthorized: (connId: string) => Promise<any[]>
+    addAuthorized: (connId: string, publicKeyLine: string) => Promise<void>
+    removeAuthorized: (connId: string, rawLine: string) => Promise<void>
+  }
+  ssh: {
+    connect: (serverId: string) => Promise<any>
+    disconnect: (connId: string) => Promise<void>
+    exec: (connId: string, command: string) => Promise<any>
+    onStatusChange: (callback: (state: any) => void) => () => void
+  }
+  updater: {
+    getState: () => Promise<any>
+    check: () => Promise<any>
+    download: () => Promise<void>
+    install: () => void
+    onStatus: (callback: (state: any) => void) => () => void
   }
 }
 

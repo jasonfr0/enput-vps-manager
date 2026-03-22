@@ -3,12 +3,14 @@ import { IPC_CHANNELS, ServerConfig } from './types'
 
 // Expose a safe API to the renderer process
 contextBridge.exposeInMainWorld('api', {
-  // SSH Connection
+  // SSH Connection + generic exec
   ssh: {
     connect: (serverId: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.SSH_CONNECT, { serverId }),
     disconnect: (connId: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.SSH_DISCONNECT, { connId }),
+    exec: (connId: string, command: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.SSH_EXEC, { connId, command }),
     onStatusChange: (callback: (state: any) => void) => {
       const handler = (_: any, state: any) => callback(state)
       ipcRenderer.on(IPC_CHANNELS.SSH_STATUS, handler)
@@ -81,6 +83,8 @@ contextBridge.exposeInMainWorld('api', {
       }),
     mkdir: (connId: string, path: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.SFTP_MKDIR, { connId, path }),
+    deleteDir: (connId: string, path: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.SFTP_DELETE_DIR, { connId, path }),
     onTransferProgress: (callback: (data: any) => void) => {
       const handler = (_: any, payload: any) => callback(payload)
       ipcRenderer.on(IPC_CHANNELS.SFTP_TRANSFER_PROGRESS, handler)
@@ -112,6 +116,9 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke(IPC_CHANNELS.CLAUDE_CHAT, { connId, messages }),
     execute: (connId: string, command: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.CLAUDE_EXECUTE, { connId, command }),
+    setApiKey: (key: string) =>
+      ipcRenderer.invoke('claude:setApiKey', { key }),
+    getApiKey: () => ipcRenderer.invoke('claude:getApiKey'),
     onStream: (callback: (data: any) => void) => {
       const handler = (_: any, payload: any) => callback(payload)
       ipcRenderer.on(IPC_CHANNELS.CLAUDE_CHAT_STREAM, handler)
@@ -139,11 +146,57 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_SET, { key, value }),
   },
 
+  // SSH Key Management
+  sshKeys: {
+    listLocal: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.SSHKEY_LIST_LOCAL),
+    generate: (name: string, type: 'ed25519' | 'rsa', passphrase: string, comment: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.SSHKEY_GENERATE, { name, type, passphrase, comment }),
+    delete: (name: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.SSHKEY_DELETE, { name }),
+    getPublic: (name: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.SSHKEY_GET_PUBLIC, { name }),
+    listAuthorized: (connId: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.SSHKEY_LIST_AUTHORIZED, { connId }),
+    addAuthorized: (connId: string, publicKeyLine: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.SSHKEY_ADD_AUTHORIZED, { connId, publicKeyLine }),
+    removeAuthorized: (connId: string, rawLine: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.SSHKEY_REMOVE_AUTHORIZED, { connId, rawLine }),
+  },
+
+  // Native OS notification (fires only when window is not focused)
+  notify: {
+    send: (title: string, body?: string) =>
+      ipcRenderer.send('notify:send', { title, body }),
+  },
+
   // Dialog helpers
   dialog: {
     openFile: (options?: any) =>
       ipcRenderer.invoke('dialog:openFile', options),
     saveFile: (options?: any) =>
       ipcRenderer.invoke('dialog:saveFile', options),
+  },
+
+  // Auto-updater
+  updater: {
+    /** Get the current update state (for rehydration on startup). */
+    getState: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.UPDATE_GET),
+    /** Manually trigger an update check. */
+    check: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.UPDATE_CHECK),
+    /** Start downloading the available update. */
+    download: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.UPDATE_DOWNLOAD),
+    /** Quit and install the downloaded update. */
+    install: () =>
+      ipcRenderer.send(IPC_CHANNELS.UPDATE_INSTALL),
+    /** Subscribe to status pushes from the main process. Returns unsubscribe fn. */
+    onStatus: (callback: (state: any) => void) => {
+      const handler = (_: any, state: any) => callback(state)
+      ipcRenderer.on(IPC_CHANNELS.UPDATE_STATUS, handler)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.UPDATE_STATUS, handler)
+    },
   },
 })

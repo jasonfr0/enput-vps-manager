@@ -65,6 +65,23 @@ export interface TransferProgress {
   speed: number
 }
 
+// SSH Key types (re-exported from manager for renderer use)
+export interface SSHKeyInfo {
+  name: string
+  privatePath: string
+  publicPath: string
+  type: string
+  comment: string
+  fingerprint: string
+}
+
+export interface AuthorizedKey {
+  type: string
+  key: string
+  comment: string
+  raw: string
+}
+
 // IPC channel names
 export const IPC_CHANNELS = {
   // SSH
@@ -88,6 +105,7 @@ export const IPC_CHANNELS = {
   SFTP_DELETE: 'sftp:delete',
   SFTP_RENAME: 'sftp:rename',
   SFTP_MKDIR: 'sftp:mkdir',
+  SFTP_DELETE_DIR: 'sftp:deleteDir',
   SFTP_TRANSFER_PROGRESS: 'sftp:transferProgress',
 
   // Monitoring
@@ -109,4 +127,23 @@ export const IPC_CHANNELS = {
   // Settings
   SETTINGS_GET: 'settings:get',
   SETTINGS_SET: 'settings:set',
+
+  // SSH exec (generic)
+  SSH_EXEC: 'ssh:exec',
+
+  // SSH Key Management
+  SSHKEY_LIST_LOCAL:        'sshkey:listLocal',
+  SSHKEY_GENERATE:          'sshkey:generate',
+  SSHKEY_DELETE:            'sshkey:delete',
+  SSHKEY_GET_PUBLIC:        'sshkey:getPublic',
+  SSHKEY_LIST_AUTHORIZED:   'sshkey:listAuthorized',
+  SSHKEY_ADD_AUTHORIZED:    'sshkey:addAuthorized',
+  SSHKEY_REMOVE_AUTHORIZED: 'sshkey:removeAuthorized',
+
+  // Auto-updater
+  UPDATE_CHECK:    'update:check',
+  UPDATE_DOWNLOAD: 'update:download',
+  UPDATE_INSTALL:  'update:install',
+  UPDATE_GET:      'update:get',
+  UPDATE_STATUS:   'update:status',   // main → renderer push
 } as const

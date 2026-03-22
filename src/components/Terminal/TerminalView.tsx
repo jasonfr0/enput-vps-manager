@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
+import { useSettingsStore } from '../../context/useSettingsStore'
 
 interface TerminalViewProps {
   connId: string
@@ -12,6 +13,7 @@ export function TerminalView({ connId }: TerminalViewProps) {
   const fitAddonRef = useRef<FitAddon | null>(null)
   const shellIdRef = useRef<string | null>(null)
   const [isReady, setIsReady] = useState(false)
+  const { terminalFontSize, terminalScrollback, terminalCursorStyle, terminalCursorBlink } = useSettingsStore()
 
   useEffect(() => {
     if (!termRef.current) return
@@ -42,11 +44,11 @@ export function TerminalView({ connId }: TerminalViewProps) {
         brightWhite: '#ffffff',
       },
       fontFamily: "'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace",
-      fontSize: 14,
+      fontSize: terminalFontSize,
       lineHeight: 1.2,
-      cursorBlink: true,
-      cursorStyle: 'bar',
-      scrollback: 10000,
+      cursorBlink: terminalCursorBlink,
+      cursorStyle: terminalCursorStyle,
+      scrollback: terminalScrollback,
       allowProposedApi: true,
     })
 
@@ -112,7 +114,7 @@ export function TerminalView({ connId }: TerminalViewProps) {
       }
       terminal.dispose()
     }
-  }, [connId])
+  }, [connId, terminalFontSize, terminalScrollback, terminalCursorStyle, terminalCursorBlink])
 
   return (
     <div style={styles.container}>

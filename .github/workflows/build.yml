@@ -1,0 +1,217 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Enput VPS Manager — Build & Release workflow
+#
+# Triggers:
+#   • Push to main/master              → build only (no release)
+#   • Push a tag matching v*.*.*       → build + create GitHub Release
+#   • Manual dispatch (workflow_dispatch)
+#
+# Required GitHub Secrets (Settings → Secrets → Actions):
+#
+#   WINDOWS:
+#     WIN_CSC_LINK            Base64-encoded .pfx certificate
+#                             Encode with: base64 -w 0 cert.pfx
+#     WIN_CSC_KEY_PASSWORD    Password for the .pfx
+#
+#   MACOS:
+#     CSC_LINK                Base64-encoded .p12 certificate
+#                             (Export "Developer ID Application" from Keychain)
+#                             Encode with: base64 -w 0 cert.p12
+#     CSC_KEY_PASSWORD        Password for the .p12
+#     APPLE_ID                Your Apple ID email
+#     APPLE_APP_SPECIFIC_PASSWORD   App-specific password (appleid.apple.com)
+#     APPLE_TEAM_ID           10-character Apple Team ID
+#
+# To build without signing, simply don't add the secrets — the workflow will
+# skip signing automatically and produce unsigned (but still working) builds.
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: Build & Release
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - 'v*.*.*'
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+    inputs:
+      draft_release:
+        description: 'Create as draft release'
+        required: false
+        default: 'true'
+        type: boolean
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ───────────────────────────────────────────────────────────────────────────
+  # Build matrix — Windows, macOS, Linux
+  # ───────────────────────────────────────────────────────────────────────────
+  build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: win
+          - os: macos-latest
+            platform: mac
+          - os: ubuntu-22.04
+            platform: linux
+
+    steps:
+      # ── Checkout ───────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # ── Node.js setup ──────────────────────────────────────────────────────
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # ── Linux: system dependencies ─────────────────────────────────────────
+      - name: Install Linux build dependencies
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y \
+            rpm \
+            fakeroot \
+            dpkg \
+            libgtk-3-dev \
+            libnss3-dev \
+            libxss-dev \
+            libxtst-dev \
+            libatspi2.0-dev
+
+      # ── Install npm dependencies ────────────────────────────────────────────
+      - name: Install dependencies
+        run: npm ci
+
+      # ── Build renderer + main + preload ────────────────────────────────────
+      - name: Build application
+        run: npm run build
+
+      # ── Windows: package + sign ─────────────────────────────────────────────
+      - name: Package (Windows)
+        if: matrix.os == 'windows-latest'
+        env:
+          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+          # Uncomment for Azure Trusted Signing:
+          # AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          # AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          # AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+        run: npm run dist:win
+
+      # ── macOS: package + sign + notarize ───────────────────────────────────
+      - name: Package (macOS)
+        if: matrix.os == 'macos-latest'
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: npm run dist:mac
+
+      # ── Linux: package ─────────────────────────────────────────────────────
+      - name: Package (Linux)
+        if: matrix.os == 'ubuntu-22.04'
+        run: npm run dist:linux
+
+      # ── Upload build artifacts ─────────────────────────────────────────────
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.platform }}
+          path: |
+            release/*.exe
+            release/*.msi
+            release/*.dmg
+            release/*.zip
+            release/*.AppImage
+            release/*.deb
+            release/*.rpm
+            release/latest*.yml
+          retention-days: 30
+          if-no-files-found: warn
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # Release — only runs on version tags (v*.*.*)
+  # ───────────────────────────────────────────────────────────────────────────
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-22.04
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Download all platform artifacts
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+          merge-multiple: true
+
+      - name: List artifacts
+        run: find release-artifacts -type f | sort
+
+      # Parse version and changelog from tag annotation or CHANGELOG.md
+      - name: Get release info
+        id: release_info
+        run: |
+          VERSION="${GITHUB_REF_NAME}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+          # Try to extract changelog section for this version
+          if [ -f CHANGELOG.md ]; then
+            NOTES=$(awk "/^## \[?${VERSION#v}\]?/{found=1; next} found && /^## /{exit} found{print}" CHANGELOG.md)
+            if [ -z "$NOTES" ]; then
+              NOTES="Release ${VERSION}"
+            fi
+          else
+            NOTES="Release ${VERSION}"
+          fi
+          # Write to file to preserve multi-line content
+          echo "${NOTES}" > /tmp/release_notes.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Enput VPS Manager ${{ steps.release_info.outputs.version }}
+          body_path: /tmp/release_notes.md
+          draft: ${{ github.event.inputs.draft_release == 'true' || true }}
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          files: |
+            release-artifacts/*.exe
+            release-artifacts/*.msi
+            release-artifacts/*.dmg
+            release-artifacts/*.zip
+            release-artifacts/*.AppImage
+            release-artifacts/*.deb
+            release-artifacts/*.rpm
+            release-artifacts/latest*.yml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

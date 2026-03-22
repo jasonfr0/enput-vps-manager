@@ -7,6 +7,9 @@ interface ChatInterfaceProps {
 
 export function ChatInterface({ connId }: ChatInterfaceProps) {
   const [input, setInput] = useState('')
+  const [hasApiKey, setHasApiKey] = useState<boolean | null>(null)
+  const [apiKeyInput, setApiKeyInput] = useState('')
+  const [showApiKeyForm, setShowApiKeyForm] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const {
     messages,
@@ -16,9 +19,22 @@ export function ChatInterface({ connId }: ChatInterfaceProps) {
     setLoading,
   } = useChatStore()
 
+  // Check if API key is configured on mount
+  useEffect(() => {
+    window.api.claude.getApiKey().then((has: boolean) => setHasApiKey(has))
+  }, [])
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, streamingContent])
+
+  const handleSetApiKey = async () => {
+    if (!apiKeyInput.trim()) return
+    await window.api.claude.setApiKey(apiKeyInput.trim())
+    setHasApiKey(true)
+    setShowApiKeyForm(false)
+    setApiKeyInput('')
+  }
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return
@@ -185,10 +201,43 @@ export function ChatInterface({ connId }: ChatInterfaceProps) {
             <h3 style={{ color: 'var(--text-primary)', marginBottom: '8px' }}>
               Claude Assistant
             </h3>
-            <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>
+            <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '12px' }}>
               Ask Claude to help with your VPS. Code blocks can be run directly
               on the server.
             </p>
+            {hasApiKey === false && !showApiKeyForm && (
+              <button style={styles.apiKeyBtn} onClick={() => setShowApiKeyForm(true)}>
+                Set Anthropic API Key to get started
+              </button>
+            )}
+            {showApiKeyForm && (
+              <div style={styles.apiKeyForm}>
+                <input
+                  style={styles.apiKeyInput}
+                  type="password"
+                  value={apiKeyInput}
+                  onChange={(e) => setApiKeyInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleSetApiKey() }}
+                  placeholder="sk-ant-..."
+                  autoFocus
+                />
+                <button style={styles.apiKeySaveBtn} onClick={handleSetApiKey}>Save</button>
+                <button
+                  style={{ ...styles.apiKeyBtn, background: 'var(--bg-tertiary)' }}
+                  onClick={() => setShowApiKeyForm(false)}
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+            {hasApiKey && (
+              <button
+                style={{ ...styles.apiKeyBtn, background: 'var(--bg-tertiary)', fontSize: '11px' }}
+                onClick={() => setShowApiKeyForm(true)}
+              >
+                Change API Key
+              </button>
+            )}
           </div>
         )}
         {messages.map(renderMessage)}
@@ -354,6 +403,43 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '10px 12px',
     outline: 'none',
     lineHeight: '1.4',
+  },
+  apiKeyBtn: {
+    padding: '8px 16px',
+    background: 'var(--accent)',
+    color: '#fff',
+    border: 'none',
+    borderRadius: 'var(--radius-sm)',
+    fontSize: '12px',
+    fontWeight: 500,
+    cursor: 'pointer',
+  },
+  apiKeyForm: {
+    display: 'flex',
+    gap: '8px',
+    alignItems: 'center',
+    marginTop: '8px',
+  },
+  apiKeyInput: {
+    padding: '8px 12px',
+    background: 'var(--bg-tertiary)',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--radius-sm)',
+    color: 'var(--text-primary)',
+    fontSize: '13px',
+    fontFamily: 'var(--font-mono)',
+    width: '280px',
+    outline: 'none',
+  },
+  apiKeySaveBtn: {
+    padding: '8px 16px',
+    background: 'var(--accent)',
+    color: '#fff',
+    border: 'none',
+    borderRadius: 'var(--radius-sm)',
+    fontSize: '12px',
+    fontWeight: 500,
+    cursor: 'pointer',
   },
   sendBtn: {
     padding: '10px 20px',
