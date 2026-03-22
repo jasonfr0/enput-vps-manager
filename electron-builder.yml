@@ -88,11 +88,11 @@ nsis:
   language: 1033
   # Include VC++ redistributables if needed
   # include: build/nsis/installer.nsh
-  artifactName: ${productName}-${version}-Setup-${arch}.${ext}
+  artifactName: ${name}-${version}-Setup-${arch}.${ext}
 
 # ── Portable (no-install) ────────────────────────────────────────────────────
 portable:
-  artifactName: ${productName}-${version}-Portable-${arch}.${ext}
+  artifactName: ${name}-${version}-Portable-${arch}.${ext}
 
 # ═════════════════════════════════════════════════════════════════════════════
 # MACOS
@@ -139,7 +139,7 @@ mac:
   # secrets to GitHub Actions when you have a Developer ID certificate.
   notarize: false
 
-  artifactName: ${productName}-${version}-${arch}.${ext}
+  artifactName: ${name}-${version}-${arch}.${ext}
 
 # ── DMG options ──────────────────────────────────────────────────────────────
 dmg:
@@ -157,7 +157,7 @@ dmg:
       y: 190
       type: link
       path: /Applications
-  artifactName: ${productName}-${version}-${arch}.${ext}
+  artifactName: ${name}-${version}-${arch}.${ext}
 
 # ═════════════════════════════════════════════════════════════════════════════
 # LINUX
@@ -187,11 +187,11 @@ linux:
       Comment: Manage your VPS servers via SSH/SFTP with Claude Code integration
       Keywords: ssh;sftp;vps;server;terminal;
 
-  artifactName: ${productName}-${version}-${arch}.${ext}
+  artifactName: ${name}-${version}-${arch}.${ext}
 
 # ── AppImage ─────────────────────────────────────────────────────────────────
 appImage:
-  artifactName: ${productName}-${version}-${arch}.AppImage
+  artifactName: ${name}-${version}-${arch}.AppImage
 
 # ── Debian package ───────────────────────────────────────────────────────────
 deb:
@@ -206,8 +206,8 @@ deb:
     - libdrm2
     - libgbm1
     - libxcb-dri3-0
-  artifactName: ${productName}_${version}_${arch}.${ext}
+  artifactName: ${name}_${version}_${arch}.${ext}
 
 # ── RPM package ──────────────────────────────────────────────────────────────
 rpm:
-  artifactName: ${productName}-${version}.${arch}.${ext}
+  artifactName: ${name}-${version}.${arch}.${ext}
