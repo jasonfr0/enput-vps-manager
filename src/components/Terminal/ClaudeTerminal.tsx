@@ -49,7 +49,7 @@ export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
       lineHeight: 1.2,
       cursorBlink: terminalCursorBlink,
       cursorStyle: terminalCursorStyle,
-      scrollback: terminalScrollback,
+      scrollback: 0,
       allowProposedApi: true,
     })
 

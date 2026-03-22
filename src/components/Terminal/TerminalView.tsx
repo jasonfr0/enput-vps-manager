@@ -45,7 +45,7 @@ export function TerminalView({ connId }: TerminalViewProps) {
       lineHeight: 1.2,
       cursorBlink: terminalCursorBlink,
       cursorStyle: terminalCursorStyle,
-      scrollback: terminalScrollback,
+      scrollback: 0,
       allowProposedApi: true,
     })
 
