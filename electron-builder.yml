@@ -98,7 +98,10 @@ portable:
 # MACOS
 # ═════════════════════════════════════════════════════════════════════════════
 mac:
-  icon: public/icons/icon.icns
+  # Use the real PNG — electron-builder converts it to ICNS automatically on macOS.
+  # The icon.icns in the repo is a PNG stub (not a real ICNS), which causes
+  # "not a file" errors during the DMG build step.
+  icon: public/icons/icon-1024.png
   target:
     - target: dmg
       arch:
@@ -124,23 +127,24 @@ mac:
   #
   category: public.app-category.developer-tools
 
-  # Hardened runtime is required for notarization
+  # Hardened runtime + entitlements are needed when signing.
+  # Safe to include even without a cert — they're ignored when unsigned.
   hardenedRuntime: true
   gatekeeperAssess: false
-
-  # Entitlements grant capabilities needed by Electron under hardened runtime
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
 
-  # Notarize after signing (requires APPLE_ID + APPLE_APP_SPECIFIC_PASSWORD + APPLE_TEAM_ID)
-  notarize: true
+  # Notarization requires Apple Developer credentials (APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD,
+  # APPLE_TEAM_ID). Disabled until certs are set up — set to true and add the
+  # secrets to GitHub Actions when you have a Developer ID certificate.
+  notarize: false
 
   artifactName: ${productName}-${version}-${arch}.${ext}
 
 # ── DMG options ──────────────────────────────────────────────────────────────
 dmg:
   title: ${productName} ${version}
-  icon: public/icons/icon.icns
+  icon: public/icons/icon-1024.png
   iconSize: 100
   window:
     width: 540
