@@ -199,10 +199,12 @@ jobs:
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           name: Enput VPS Manager ${{ steps.release_info.outputs.version }}
           body_path: /tmp/release_notes.md
-          draft: ${{ github.event.inputs.draft_release == 'true' || true }}
+          draft: false
           prerelease: ${{ contains(github.ref_name, '-') }}
           files: |
             release-artifacts/*.exe
@@ -213,5 +215,3 @@ jobs:
             release-artifacts/*.deb
             release-artifacts/*.rpm
             release-artifacts/latest*.yml
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
