@@ -193,9 +193,10 @@ input:focus, textarea:focus, select:focus {
 
 .tab-content {
   animation: fadeIn 150ms ease forwards;
-  /* flex:1 + height:0 is the bulletproof CSS trick: the element's content
-     height is 0 and only flex growth determines its actual size, so it can
-     NEVER expand beyond what the flex algorithm allocates. */
+  /* position:relative turns this into a containing block so children can
+     use position:absolute to fill it exactly — no percentage-height
+     ambiguity against a flex-determined size. */
+  position: relative;
   flex: 1;
   height: 0;
   min-height: 0;

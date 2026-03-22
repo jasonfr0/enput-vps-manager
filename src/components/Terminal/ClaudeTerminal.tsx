@@ -8,11 +8,12 @@ interface ClaudeTerminalProps {
 }
 
 export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
+  const rootRef    = useRef<HTMLDivElement>(null)
+  const termRef    = useRef<HTMLDivElement>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
-  const termRef = useRef<HTMLDivElement>(null)
   const terminalRef = useRef<Terminal | null>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
-  const shellIdRef = useRef<string | null>(null)
+  const shellIdRef  = useRef<string | null>(null)
   const [isReady, setIsReady] = useState(false)
   const { terminalFontSize, terminalScrollback, terminalCursorStyle, terminalCursorBlink } = useSettingsStore()
   const [claudeStatus, setClaudeStatus] = useState<
@@ -29,22 +30,13 @@ export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
         foreground: '#e8e9f0',
         cursor: '#d4a574',
         cursorAccent: '#1a1a2e',
-        selectionBackground: 'rgba(212, 165, 116, 0.3)',
-        black: '#1a1a2e',
-        red: '#f44336',
-        green: '#4caf50',
-        yellow: '#ff9800',
-        blue: '#6c63ff',
-        magenta: '#d4a574',
-        cyan: '#00bcd4',
-        white: '#e8e9f0',
-        brightBlack: '#6b6c80',
-        brightRed: '#ff5252',
-        brightGreen: '#69f0ae',
-        brightYellow: '#ffd740',
-        brightBlue: '#7d75ff',
-        brightMagenta: '#e8c49a',
-        brightCyan: '#84ffff',
+        selectionBackground: 'rgba(212,165,116,0.3)',
+        black: '#1a1a2e',  red: '#f44336',    green: '#4caf50',
+        yellow: '#ff9800', blue: '#6c63ff',   magenta: '#d4a574',
+        cyan: '#00bcd4',   white: '#e8e9f0',  brightBlack: '#6b6c80',
+        brightRed: '#ff5252',    brightGreen: '#69f0ae',
+        brightYellow: '#ffd740', brightBlue: '#7d75ff',
+        brightMagenta: '#e8c49a',brightCyan: '#84ffff',
         brightWhite: '#ffffff',
       },
       fontFamily: "'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace",
@@ -60,8 +52,7 @@ export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
     terminal.loadAddon(fitAddon)
     terminal.open(termRef.current)
 
-    // Double-rAF ensures the browser has finished a full layout pass before
-    // fitting, so xterm gets real pixel dimensions instead of 0×0.
+    // Wait for a full layout pass so the container has real pixel dimensions.
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         fitAddon.fit()
@@ -71,54 +62,28 @@ export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
     terminalRef.current = terminal
     fitAddonRef.current = fitAddon
 
-    // Ctrl+Shift+Up/Down → scroll scrollback (works even in mouse-tracking mode)
-    terminal.attachCustomKeyEventHandler((e) => {
-      if (e.ctrlKey && e.shiftKey && e.type === 'keydown') {
-        if (e.key === 'ArrowUp')   { terminal.scrollLines(-5);  return false }
-        if (e.key === 'ArrowDown') { terminal.scrollLines(5);   return false }
-        if (e.key === 'Home')      { terminal.scrollToTop();    return false }
-        if (e.key === 'End')       { terminal.scrollToBottom(); return false }
-      }
-      return true
-    })
-
-    // Wheel handler on the wrapper — guarantees scrolling works even when
-    // Claude Code has enabled mouse-tracking (which causes xterm to forward
-    // wheel events to the pty instead of scrolling the viewport).
-    const wrapper = wrapperRef.current
-    const handleWheel = (e: WheelEvent) => {
-      e.preventDefault()
-      const lines = Math.round(e.deltaY / 25) || (e.deltaY > 0 ? 1 : -1)
-      terminal.scrollLines(lines)
-    }
-    wrapper.addEventListener('wheel', handleWheel, { passive: false })
-
-    // Handle user input
     terminal.onData((data) => {
       if (shellIdRef.current) {
         window.api.terminal.write(connId, shellIdRef.current, data)
       }
     })
 
-    // Resize observer — observe the WRAPPER (the bounded flex element),
-    // not the terminal div (which is absolutely positioned inside it).
+    // Observe the wrapper div — it is the bounded element whose size
+    // is determined by flex layout, not by xterm content.
     const resizeObserver = new ResizeObserver(() => {
       fitAddon.fit()
       if (shellIdRef.current) {
         window.api.terminal.resize(connId, shellIdRef.current, terminal.cols, terminal.rows)
       }
     })
-    resizeObserver.observe(wrapper)
+    resizeObserver.observe(wrapperRef.current!)
 
-    // Track claude detection across output events (closure variable, not state)
     let outputBuffer = ''
     let hasChecked = false
 
-    // Output listener — installed before the shell is created so no data is lost
     const unsubOutput = window.api.terminal.onOutput(({ shellId, data }: { shellId: string; data: string }) => {
       if (shellId !== shellIdRef.current) return
       terminal.write(data)
-
       if (!hasChecked) {
         outputBuffer += data
         if (outputBuffer.includes('CLAUDE_FOUND')) {
@@ -141,7 +106,6 @@ export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
       }
     })
 
-    // Shell init — hidden behind the loading overlay while the SSH banner arrives
     const initClaudeShell = async () => {
       try {
         setLoadingMsg('Connecting to VPS…')
@@ -149,28 +113,21 @@ export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
         const { shellId } = await window.api.terminal.create(connId, cols, rows)
         shellIdRef.current = shellId
 
-        // Give the SSH banner ~700 ms to fully arrive, then wipe it so the
-        // user sees a clean Claude Code terminal instead of MOTD noise.
         setLoadingMsg('Starting Claude Code…')
         await new Promise<void>((resolve) => setTimeout(resolve, 700))
-        terminal.reset()     // clears viewport + scrollback (goodbye, banner)
+        terminal.reset()
 
-        // reset() wipes xterm's internal dimension state — re-fit so the
-        // terminal knows how many cols/rows it actually has.
+        // reset() wipes xterm's dimension state — re-fit after a layout pass.
         await new Promise<void>((resolve) => {
           requestAnimationFrame(() => { requestAnimationFrame(() => { fitAddon.fit(); resolve() }) })
         })
 
-        // Now reveal the terminal
         setIsReady(true)
-
         terminal.writeln('\x1b[1;33m=== Claude Code Terminal ===\x1b[0m')
         terminal.writeln('\x1b[2mChecking if Claude Code CLI is installed…\x1b[0m\r\n')
         setClaudeStatus('checking')
-
         window.api.terminal.write(
-          connId,
-          shellId,
+          connId, shellId,
           'which claude && echo "CLAUDE_FOUND" || echo "CLAUDE_NOT_FOUND"\n'
         )
       } catch (err: any) {
@@ -179,16 +136,12 @@ export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
         setClaudeStatus('error')
       }
     }
-
     initClaudeShell()
 
     return () => {
       unsubOutput()
-      wrapper.removeEventListener('wheel', handleWheel)
       resizeObserver.disconnect()
-      if (shellIdRef.current) {
-        window.api.terminal.close(connId, shellIdRef.current)
-      }
+      if (shellIdRef.current) window.api.terminal.close(connId, shellIdRef.current)
       terminal.dispose()
     }
   }, [connId, terminalFontSize, terminalScrollback, terminalCursorStyle, terminalCursorBlink])
@@ -206,28 +159,27 @@ export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
   }
 
   return (
-    <div style={styles.container}>
-      {/* Top bar */}
+    // Root fills .tab-content (position:relative) exactly.
+    <div ref={rootRef} style={styles.root}>
       <div style={styles.topBar}>
         <div style={styles.topBarLeft}>
-          <span style={styles.claudeIcon}>✨</span>
+          <span style={{ fontSize: '14px' }}>✨</span>
           <span style={styles.topBarTitle}>Claude Code</span>
           <span style={{
             ...styles.statusBadge,
             background:
-              claudeStatus === 'running'    ? 'var(--success)'    :
-              claudeStatus === 'not-installed' ? 'var(--warning)' :
-              claudeStatus === 'error'      ? 'var(--error)'      :
+              claudeStatus === 'running'       ? 'var(--success)'  :
+              claudeStatus === 'not-installed' ? 'var(--warning)'  :
+              claudeStatus === 'error'         ? 'var(--error)'    :
               'var(--text-muted)',
           }}>
-            {claudeStatus === 'checking'      ? 'Checking…'       :
-             claudeStatus === 'not-installed' ? 'Not Installed'   :
-             claudeStatus === 'launching'     ? 'Launching…'      :
-             claudeStatus === 'running'       ? 'Running'         :
-             'Error'}
+            {claudeStatus === 'checking'      ? 'Checking…'    :
+             claudeStatus === 'not-installed' ? 'Not Installed' :
+             claudeStatus === 'launching'     ? 'Launching…'   :
+             claudeStatus === 'running'       ? 'Running'      : 'Error'}
           </span>
         </div>
-        <div style={styles.topBarActions}>
+        <div style={{ display: 'flex', gap: '6px' }}>
           {claudeStatus === 'not-installed' && (
             <button style={styles.actionBtn} onClick={handleInstallClaude}>
               Install Claude Code
@@ -241,11 +193,11 @@ export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
         </div>
       </div>
 
-      {/* Terminal area — wrapper is the bounded flex element, terminal fills it */}
-      <div style={styles.terminalWrapper} ref={wrapperRef}>
-        <div ref={termRef} style={styles.terminal} />
-
-        {/* Loading overlay — hides SSH banner until we've cleared it */}
+      {/* wrapperRef is the bounded flex element that ResizeObserver watches.
+          overflow:hidden clips xterm visually. The termRef div inside is
+          position:absolute so xterm fills the wrapper exactly. */}
+      <div ref={wrapperRef} style={styles.termWrapper}>
+        <div ref={termRef} style={styles.term} />
         {!isReady && (
           <div style={styles.loading}>
             <div style={styles.loadingDot} />
@@ -258,8 +210,10 @@ export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  container: {
-    height: '100%',
+  // Fills .tab-content (position:relative) exactly via absolute positioning.
+  root: {
+    position: 'absolute',
+    inset: 0,
     display: 'flex',
     flexDirection: 'column',
     background: '#1a1a2e',
@@ -274,25 +228,12 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'var(--bg-secondary)',
     flexShrink: 0,
   },
-  topBarLeft: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-  },
-  claudeIcon: { fontSize: '14px' },
-  topBarTitle: {
-    fontSize: '13px',
-    fontWeight: 600,
-    color: 'var(--text-primary)',
-  },
+  topBarLeft: { display: 'flex', alignItems: 'center', gap: '8px' },
+  topBarTitle: { fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' },
   statusBadge: {
-    fontSize: '10px',
-    fontWeight: 600,
-    color: '#fff',
-    padding: '2px 8px',
-    borderRadius: '10px',
+    fontSize: '10px', fontWeight: 600, color: '#fff',
+    padding: '2px 8px', borderRadius: '10px',
   },
-  topBarActions: { display: 'flex', gap: '6px' },
   actionBtn: {
     padding: '4px 12px',
     background: 'var(--accent)',
@@ -303,18 +244,19 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 500,
     cursor: 'pointer',
   },
-  // Wrapper is the bounded flex element — clips overflow visually, but does
-  // NOT set overflow on the terminal div itself so xterm's .xterm-viewport
-  // scrollbar stays interactive.
-  terminalWrapper: {
+  // flex:1 + minHeight:0 lets this fill remaining root height without growing.
+  // overflow:hidden clips xterm visually; position:relative anchors the
+  // absolutely-positioned term div and loading overlay.
+  termWrapper: {
     flex: 1,
+    minHeight: 0,
     position: 'relative',
     overflow: 'hidden',
-    minHeight: 0,
   },
-  // Terminal fills wrapper exactly via absolute positioning.
-  // NO overflow:hidden — xterm needs its .xterm-viewport overflow-y:scroll.
-  terminal: {
+  // The div passed to terminal.open(). position:absolute + inset:0 pins it
+  // exactly to termWrapper's pixel bounds. NO overflow:hidden — xterm's own
+  // .xterm-viewport (overflow-y:scroll) handles clipping and scrolling.
+  term: {
     position: 'absolute',
     inset: 0,
   },
@@ -330,8 +272,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '13px',
   },
   loadingDot: {
-    width: 8,
-    height: 8,
+    width: 8, height: 8,
     borderRadius: '50%',
     background: 'var(--accent)',
     animation: 'pulse 1.4s ease-in-out infinite',
