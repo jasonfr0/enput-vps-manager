@@ -8,6 +8,7 @@ interface ClaudeTerminalProps {
 }
 
 export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
+  const wrapperRef = useRef<HTMLDivElement>(null)
   const termRef = useRef<HTMLDivElement>(null)
   const terminalRef = useRef<Terminal | null>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
@@ -20,7 +21,7 @@ export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
   const [loadingMsg, setLoadingMsg] = useState('Connecting to VPS…')
 
   useEffect(() => {
-    if (!termRef.current) return
+    if (!termRef.current || !wrapperRef.current) return
 
     const terminal = new Terminal({
       theme: {
@@ -70,7 +71,7 @@ export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
     terminalRef.current = terminal
     fitAddonRef.current = fitAddon
 
-    // Ctrl+Shift+Up/Down → scroll scrollback without fighting mouse-tracking mode
+    // Ctrl+Shift+Up/Down → scroll scrollback (works even in mouse-tracking mode)
     terminal.attachCustomKeyEventHandler((e) => {
       if (e.ctrlKey && e.shiftKey && e.type === 'keydown') {
         if (e.key === 'ArrowUp')   { terminal.scrollLines(-5);  return false }
@@ -81,6 +82,17 @@ export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
       return true
     })
 
+    // Wheel handler on the wrapper — guarantees scrolling works even when
+    // Claude Code has enabled mouse-tracking (which causes xterm to forward
+    // wheel events to the pty instead of scrolling the viewport).
+    const wrapper = wrapperRef.current
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault()
+      const lines = Math.round(e.deltaY / 25) || (e.deltaY > 0 ? 1 : -1)
+      terminal.scrollLines(lines)
+    }
+    wrapper.addEventListener('wheel', handleWheel, { passive: false })
+
     // Handle user input
     terminal.onData((data) => {
       if (shellIdRef.current) {
@@ -88,14 +100,15 @@ export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
       }
     })
 
-    // Resize observer — refit whenever the container resizes
+    // Resize observer — observe the WRAPPER (the bounded flex element),
+    // not the terminal div (which is absolutely positioned inside it).
     const resizeObserver = new ResizeObserver(() => {
       fitAddon.fit()
       if (shellIdRef.current) {
         window.api.terminal.resize(connId, shellIdRef.current, terminal.cols, terminal.rows)
       }
     })
-    if (termRef.current) resizeObserver.observe(termRef.current)
+    resizeObserver.observe(wrapper)
 
     // Track claude detection across output events (closure variable, not state)
     let outputBuffer = ''
@@ -143,8 +156,7 @@ export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
         terminal.reset()     // clears viewport + scrollback (goodbye, banner)
 
         // reset() wipes xterm's internal dimension state — re-fit so the
-        // terminal knows how many cols/rows it actually has. Without this,
-        // scroll is broken for the lifetime of the session.
+        // terminal knows how many cols/rows it actually has.
         await new Promise<void>((resolve) => {
           requestAnimationFrame(() => { requestAnimationFrame(() => { fitAddon.fit(); resolve() }) })
         })
@@ -172,6 +184,7 @@ export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
 
     return () => {
       unsubOutput()
+      wrapper.removeEventListener('wheel', handleWheel)
       resizeObserver.disconnect()
       if (shellIdRef.current) {
         window.api.terminal.close(connId, shellIdRef.current)
@@ -225,22 +238,11 @@ export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
               Launch claude
             </button>
           )}
-          {/* Scroll controls — work even when Claude Code has mouse-tracking enabled */}
-          <button
-            style={styles.scrollBtn}
-            title="Scroll up (or use mouse wheel)"
-            onClick={() => terminalRef.current?.scrollLines(-20)}
-          >↑</button>
-          <button
-            style={styles.scrollBtn}
-            title="Scroll to bottom"
-            onClick={() => terminalRef.current?.scrollToBottom()}
-          >↓</button>
         </div>
       </div>
 
-      {/* Terminal container — must be overflow:hidden + minHeight:0 for xterm scroll */}
-      <div style={styles.terminalWrapper}>
+      {/* Terminal area — wrapper is the bounded flex element, terminal fills it */}
+      <div style={styles.terminalWrapper} ref={wrapperRef}>
         <div ref={termRef} style={styles.terminal} />
 
         {/* Loading overlay — hides SSH banner until we've cleared it */}
@@ -301,28 +303,20 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 500,
     cursor: 'pointer',
   },
-  scrollBtn: {
-    padding: '2px 8px',
-    background: 'var(--bg-tertiary)',
-    color: 'var(--text-secondary)',
-    border: '1px solid var(--border)',
-    borderRadius: 'var(--radius-sm)',
-    fontSize: '13px',
-    lineHeight: '18px',
-    cursor: 'pointer',
-  },
-  // Wrapper must be overflow:hidden + minHeight:0 so xterm's inner
-  // scrollable viewport has bounded height inside the flex column.
+  // Wrapper is the bounded flex element — clips overflow visually, but does
+  // NOT set overflow on the terminal div itself so xterm's .xterm-viewport
+  // scrollbar stays interactive.
   terminalWrapper: {
     flex: 1,
     position: 'relative',
     overflow: 'hidden',
     minHeight: 0,
   },
+  // Terminal fills wrapper exactly via absolute positioning.
+  // NO overflow:hidden — xterm needs its .xterm-viewport overflow-y:scroll.
   terminal: {
     position: 'absolute',
     inset: 0,
-    overflow: 'hidden',
   },
   loading: {
     position: 'absolute',

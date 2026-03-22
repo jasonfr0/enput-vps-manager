@@ -8,6 +8,7 @@ interface TerminalViewProps {
 }
 
 export function TerminalView({ connId }: TerminalViewProps) {
+  const wrapperRef = useRef<HTMLDivElement>(null)
   const termRef = useRef<HTMLDivElement>(null)
   const terminalRef = useRef<Terminal | null>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
@@ -16,7 +17,7 @@ export function TerminalView({ connId }: TerminalViewProps) {
   const { terminalFontSize, terminalScrollback, terminalCursorStyle, terminalCursorBlink } = useSettingsStore()
 
   useEffect(() => {
-    if (!termRef.current) return
+    if (!termRef.current || !wrapperRef.current) return
 
     // Create terminal
     const terminal = new Terminal({
@@ -56,10 +57,8 @@ export function TerminalView({ connId }: TerminalViewProps) {
     terminal.loadAddon(fitAddon)
     terminal.open(termRef.current)
 
-    // Double rAF: wait for the browser to do a full layout pass so the
-    // container has real pixel dimensions before fitting. Without this,
-    // the div is still 0×0 and xterm initialises with 0 cols/rows,
-    // which breaks scrolling for the entire lifetime of the terminal.
+    // Double rAF: wait for browser layout pass so the container has real
+    // pixel dimensions before fitting.
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         fitAddon.fit()
@@ -69,7 +68,7 @@ export function TerminalView({ connId }: TerminalViewProps) {
     terminalRef.current = terminal
     fitAddonRef.current = fitAddon
 
-    // Ctrl+Shift+Up/Down → scroll scrollback without fighting mouse-tracking mode
+    // Ctrl+Shift+Up/Down → scroll scrollback (works even in mouse-tracking mode)
     terminal.attachCustomKeyEventHandler((e) => {
       if (e.ctrlKey && e.shiftKey && e.type === 'keydown') {
         if (e.key === 'ArrowUp')   { terminal.scrollLines(-5);  return false }
@@ -79,6 +78,17 @@ export function TerminalView({ connId }: TerminalViewProps) {
       }
       return true
     })
+
+    // Wheel handler on the wrapper — guarantees scrolling works even when a
+    // running program has enabled mouse-tracking (which causes xterm to
+    // forward wheel events to the pty instead of scrolling the viewport).
+    const wrapper = wrapperRef.current
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault()
+      const lines = Math.round(e.deltaY / 25) || (e.deltaY > 0 ? 1 : -1)
+      terminal.scrollLines(lines)
+    }
+    wrapper.addEventListener('wheel', handleWheel, { passive: false })
 
     // Create SSH shell
     const initShell = async () => {
@@ -103,7 +113,8 @@ export function TerminalView({ connId }: TerminalViewProps) {
       }
     })
 
-    // Handle resize
+    // Handle resize — observe the WRAPPER (the bounded flex element),
+    // not the terminal div (which is absolutely positioned inside it).
     const handleResize = () => {
       fitAddon.fit()
       if (shellIdRef.current) {
@@ -117,7 +128,7 @@ export function TerminalView({ connId }: TerminalViewProps) {
     }
 
     const resizeObserver = new ResizeObserver(handleResize)
-    resizeObserver.observe(termRef.current)
+    resizeObserver.observe(wrapper)
 
     // Listen for shell output
     const unsubOutput = window.api.terminal.onOutput(({ shellId, data }) => {
@@ -128,6 +139,7 @@ export function TerminalView({ connId }: TerminalViewProps) {
 
     return () => {
       unsubOutput()
+      wrapper.removeEventListener('wheel', handleWheel)
       resizeObserver.disconnect()
       if (shellIdRef.current) {
         window.api.terminal.close(connId, shellIdRef.current)
@@ -137,14 +149,7 @@ export function TerminalView({ connId }: TerminalViewProps) {
   }, [connId, terminalFontSize, terminalScrollback, terminalCursorStyle, terminalCursorBlink])
 
   return (
-    <div style={styles.container}>
-      {/* Scroll controls — work even when a program has mouse-tracking enabled */}
-      <div style={styles.scrollBar}>
-        <button style={styles.scrollBtn} title="Scroll up  (Ctrl+Shift+↑)"
-          onClick={() => terminalRef.current?.scrollLines(-20)}>↑</button>
-        <button style={styles.scrollBtn} title="Scroll to bottom  (Ctrl+Shift+End)"
-          onClick={() => terminalRef.current?.scrollToBottom()}>↓</button>
-      </div>
+    <div style={styles.wrapper} ref={wrapperRef}>
       <div ref={termRef} style={styles.terminal} />
       {!isReady && (
         <div style={styles.loading}>
@@ -156,35 +161,20 @@ export function TerminalView({ connId }: TerminalViewProps) {
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  container: {
+  // Single wrapper: bounded by flex parent, clips overflow, hosts the
+  // absolutely-positioned terminal div + loading overlay.
+  wrapper: {
     height: '100%',
-    display: 'flex',
-    flexDirection: 'column',
     position: 'relative',
+    overflow: 'hidden',
     background: '#1a1b2e',
   },
-  scrollBar: {
-    display: 'flex',
-    gap: '4px',
-    padding: '4px 8px',
-    borderBottom: '1px solid var(--border)',
-    background: 'var(--bg-secondary)',
-    flexShrink: 0,
-  },
-  scrollBtn: {
-    padding: '2px 8px',
-    background: 'var(--bg-tertiary)',
-    color: 'var(--text-secondary)',
-    border: '1px solid var(--border)',
-    borderRadius: 'var(--radius-sm)',
-    fontSize: '13px',
-    lineHeight: '18px',
-    cursor: 'pointer',
-  },
+  // The terminal div fills the wrapper exactly via absolute positioning.
+  // NO overflow:hidden here — xterm's .xterm-viewport needs its own
+  // overflow-y:scroll to remain interactive for scrolling.
   terminal: {
-    flex: 1,
-    minHeight: 0,
-    overflow: 'hidden',
+    position: 'absolute',
+    inset: 0,
   },
   loading: {
     position: 'absolute',

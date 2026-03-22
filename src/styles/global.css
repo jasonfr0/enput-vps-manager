@@ -193,10 +193,11 @@ input:focus, textarea:focus, select:focus {
 
 .tab-content {
   animation: fadeIn 150ms ease forwards;
-  /* Use flex instead of height:100% so the percentage resolves correctly
-     against a flex-determined parent height (avoids the container growing
-     with content instead of staying bounded). */
+  /* flex:1 + height:0 is the bulletproof CSS trick: the element's content
+     height is 0 and only flex growth determines its actual size, so it can
+     NEVER expand beyond what the flex algorithm allocates. */
   flex: 1;
+  height: 0;
   min-height: 0;
   overflow: hidden;
 }

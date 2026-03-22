@@ -231,9 +231,9 @@ const styles: Record<string, React.CSSProperties> = {
   },
   content: {
     flex: 1,
-    minHeight: 0,          // allow flex item to shrink below content size
+    height: 0,             // content height is 0 — only flex growth sets the size
+    minHeight: 0,
     overflow: 'hidden',
-    position: 'relative',
     display: 'flex',
     flexDirection: 'column',
   },
