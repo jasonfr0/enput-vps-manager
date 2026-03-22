@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useLayoutEffect, useRef, useState } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { useSettingsStore } from '../../context/useSettingsStore'
@@ -16,7 +16,11 @@ export function TerminalView({ connId }: TerminalViewProps) {
   const [isReady, setIsReady] = useState(false)
   const { terminalFontSize, terminalScrollback, terminalCursorStyle, terminalCursorBlink } = useSettingsStore()
 
-  useEffect(() => {
+  // useLayoutEffect fires synchronously after the DOM is mutated but BEFORE
+  // the browser paints. At this point the CSS layout is fully resolved, so
+  // termEl.offsetHeight is the true rendered height — no animation-frame
+  // delays needed, and FitAddon gets the correct rows/cols immediately.
+  useLayoutEffect(() => {
     const wrapper = wrapperRef.current
     const termEl  = termRef.current
     if (!wrapper || !termEl) return
@@ -52,33 +56,38 @@ export function TerminalView({ connId }: TerminalViewProps) {
     terminalRef.current = terminal
     fitAddonRef.current = fitAddon
 
-    // ── Size sync ──────────────────────────────────────────────────────────
-    // termEl is position:absolute; inset:0 inside wrapper, so it always
-    // fills wrapper exactly. FitAddon reads termEl's offsetWidth/Height
-    // (== wrapper's rendered size) to calculate cols/rows. scrollToBottom()
-    // is called after every fit so the cursor stays in view.
+    // ── Scroll helper ─────────────────────────────────────────────────────
+    // Setting .xterm-viewport scrollTop directly is more reliable than
+    // terminal.scrollToBottom(). It triggers xterm's native scroll event
+    // listener which updates the internal ydisp state, so xterm keeps
+    // auto-scrolling on subsequent writes without us fighting its render
+    // cycle. We also call the API as a belt-and-suspenders measure.
+    const scrollToBottom = () => {
+      const vp = termEl.querySelector('.xterm-viewport') as HTMLElement | null
+      if (vp) vp.scrollTop = vp.scrollHeight
+      terminal.scrollToBottom()
+    }
+
+    // ── Size sync ─────────────────────────────────────────────────────────
+    // Dimensions are resolved because we're in useLayoutEffect, so we call
+    // fit() immediately — no animation-frame dancing required.
     const syncSize = () => {
       fitAddon.fit()
-      // Call scrollToBottom twice: once immediately (before the resize
-      // render) and once after the next frame (after xterm's post-resize
-      // repaint). Without both calls, fit()'s internal terminal.resize()
-      // resets the viewport to the top and the single deferred call
-      // sometimes loses the race against xterm's own render.
-      terminal.scrollToBottom()
-      requestAnimationFrame(() => terminal.scrollToBottom())
+      scrollToBottom()
+      // One extra frame covers xterm's post-resize canvas repaint.
+      requestAnimationFrame(scrollToBottom)
       if (shellIdRef.current) {
         window.api.terminal.resize(connId, shellIdRef.current, terminal.cols, terminal.rows)
       }
     }
 
-    // Initial fit — wait for two frames so the flex layout is done.
-    requestAnimationFrame(() => requestAnimationFrame(syncSize))
+    syncSize()
 
-    // Re-fit whenever the wrapper resizes (window resize, sidebar toggle, etc.)
+    // Re-fit whenever the wrapper changes size (window resize, sidebar, etc.)
     const ro = new ResizeObserver(syncSize)
     ro.observe(wrapper)
 
-    // ── Shell ──────────────────────────────────────────────────────────────
+    // ── Shell ─────────────────────────────────────────────────────────────
     const initShell = async () => {
       try {
         const { cols, rows } = terminal
@@ -98,10 +107,10 @@ export function TerminalView({ connId }: TerminalViewProps) {
 
     const unsubOutput = window.api.terminal.onOutput(({ shellId, data }) => {
       if (shellId === shellIdRef.current) {
-        // Use the write callback so scrollToBottom fires AFTER xterm has
-        // parsed and buffered the new data — not before, which would scroll
-        // to the old bottom and leave the cursor off-screen.
-        terminal.write(data, () => terminal.scrollToBottom())
+        // Write callback fires after xterm has parsed + buffered the data,
+        // so scrollToBottom lands at the actual new bottom. The extra rAF
+        // covers xterm's canvas redraw which happens in the next frame.
+        terminal.write(data, () => requestAnimationFrame(scrollToBottom))
       }
     })
 
@@ -126,18 +135,14 @@ export function TerminalView({ connId }: TerminalViewProps) {
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  // The wrapper IS the bounding box. overflow:hidden clips anything that
-  // extends beyond it. Its size comes from .tab-content via absolute pos.
   wrapper: {
     position: 'absolute',
     inset: 0,
     overflow: 'hidden',
     background: '#1a1b2e',
   },
-  // termEl fills wrapper exactly via absolute+inset:0. Being absolutely
-  // positioned it never participates in normal flow, so xterm's canvas and
-  // viewport cannot push the layout. overflow:hidden clips any sub-pixel
-  // overhang from the canvas sizing calculations.
+  // Absolutely positioned so it fills wrapper exactly and never
+  // participates in normal document flow.
   term: {
     position: 'absolute',
     inset: 0,

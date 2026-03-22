@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useLayoutEffect, useRef, useState } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { useSettingsStore } from '../../context/useSettingsStore'
@@ -20,7 +20,11 @@ export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
   >('checking')
   const [loadingMsg, setLoadingMsg] = useState('Connecting to VPS…')
 
-  useEffect(() => {
+  // useLayoutEffect fires synchronously after the DOM is mutated but BEFORE
+  // the browser paints. At this point the CSS layout is fully resolved, so
+  // termEl.offsetHeight is the true rendered height — no animation-frame
+  // delays needed, and FitAddon gets the correct rows/cols immediately.
+  useLayoutEffect(() => {
     const wrapper = wrapperRef.current
     const termEl  = termRef.current
     if (!wrapper || !termEl) return
@@ -56,46 +60,52 @@ export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
     terminalRef.current = terminal
     fitAddonRef.current = fitAddon
 
-    // ── Size sync ──────────────────────────────────────────────────────────
-    // termEl is position:absolute; inset:0 inside termWrapper (position:
-    // relative), so it always fills the wrapper. FitAddon reads
-    // termEl's offsetWidth/Height directly. scrollToBottom() after every
-    // fit ensures the cursor stays visible.
+    // ── Scroll helper ─────────────────────────────────────────────────────
+    // Setting .xterm-viewport scrollTop directly is more reliable than
+    // terminal.scrollToBottom(). It triggers xterm's native scroll event
+    // listener which updates the internal ydisp state, so xterm keeps
+    // auto-scrolling on subsequent writes without us fighting its render
+    // cycle. We also call the API as a belt-and-suspenders measure.
+    const scrollToBottom = () => {
+      const vp = termEl.querySelector('.xterm-viewport') as HTMLElement | null
+      if (vp) vp.scrollTop = vp.scrollHeight
+      terminal.scrollToBottom()
+    }
+
+    // ── Size sync ─────────────────────────────────────────────────────────
+    // Dimensions are resolved because we're in useLayoutEffect, so we call
+    // fit() immediately — no animation-frame dancing required.
     const syncSize = () => {
       fitAddon.fit()
-      // Call scrollToBottom twice: once immediately (before the resize
-      // render) and once after the next frame (after xterm's post-resize
-      // repaint). Without both calls, fit()'s internal terminal.resize()
-      // resets the viewport to the top and the single deferred call
-      // sometimes loses the race against xterm's own render.
-      terminal.scrollToBottom()
-      requestAnimationFrame(() => terminal.scrollToBottom())
+      scrollToBottom()
+      // One extra frame covers xterm's post-resize canvas repaint.
+      requestAnimationFrame(scrollToBottom)
       if (shellIdRef.current) {
         window.api.terminal.resize(connId, shellIdRef.current, terminal.cols, terminal.rows)
       }
     }
 
-    // Initial fit after layout
-    requestAnimationFrame(() => requestAnimationFrame(syncSize))
+    syncSize()
 
-    // Re-fit on wrapper resize
+    // Re-fit whenever the wrapper changes size (window resize, etc.)
     const ro = new ResizeObserver(syncSize)
     ro.observe(wrapper)
 
-    // ── Input ──────────────────────────────────────────────────────────────
+    // ── Input ─────────────────────────────────────────────────────────────
     terminal.onData((data) => {
       if (shellIdRef.current) window.api.terminal.write(connId, shellIdRef.current, data)
     })
 
-    // ── Output ─────────────────────────────────────────────────────────────
+    // ── Output ────────────────────────────────────────────────────────────
     let outputBuffer = ''
     let hasChecked = false
 
     const unsubOutput = window.api.terminal.onOutput(({ shellId, data }: { shellId: string; data: string }) => {
       if (shellId !== shellIdRef.current) return
-      // Callback fires after xterm has parsed and buffered the data, so
-      // scrollToBottom lands at the real new bottom, not the old one.
-      terminal.write(data, () => terminal.scrollToBottom())
+      // Write callback fires after xterm has parsed + buffered the data,
+      // so scrollToBottom lands at the actual new bottom. The extra rAF
+      // covers xterm's canvas redraw which happens in the next frame.
+      terminal.write(data, () => requestAnimationFrame(scrollToBottom))
       if (!hasChecked) {
         outputBuffer += data
         if (outputBuffer.includes('CLAUDE_FOUND')) {
@@ -118,7 +128,7 @@ export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
       }
     })
 
-    // ── Shell init ─────────────────────────────────────────────────────────
+    // ── Shell init ────────────────────────────────────────────────────────
     const initClaudeShell = async () => {
       try {
         setLoadingMsg('Connecting to VPS…')
@@ -130,17 +140,10 @@ export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
         await new Promise<void>((resolve) => setTimeout(resolve, 700))
         terminal.reset()
 
-        // reset() wipes xterm's internal dimension state — re-fit and
-        // scroll to bottom so the cursor is immediately visible.
-        await new Promise<void>((resolve) => {
-          requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-              fitAddon.fit()
-              terminal.scrollToBottom()
-              requestAnimationFrame(() => { terminal.scrollToBottom(); resolve() })
-            })
-          })
-        })
+        // reset() wipes xterm's internal state — re-fit synchronously
+        // then scroll to the new bottom in the next frame.
+        fitAddon.fit()
+        await new Promise<void>((resolve) => requestAnimationFrame(() => { scrollToBottom(); resolve() }))
 
         setIsReady(true)
         terminal.writeln('\x1b[1;33m=== Claude Code Terminal ===\x1b[0m')
@@ -180,7 +183,6 @@ export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
 
   return (
     <div style={styles.root}>
-      {/* Top bar — fixed height, outside the terminal measurement */}
       <div style={styles.topBar}>
         <div style={styles.topBarLeft}>
           <span style={{ fontSize: '14px' }}>✨</span>
@@ -213,8 +215,6 @@ export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
         </div>
       </div>
 
-      {/* Wrapper = the measurement box. syncSize() reads its pixel bounds
-          and stamps them onto termRef. overflow:hidden clips visual excess. */}
       <div ref={wrapperRef} style={styles.termWrapper}>
         <div ref={termRef} style={styles.term} />
         {!isReady && (
@@ -262,18 +262,12 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 500,
     cursor: 'pointer',
   },
-  // Wrapper fills remaining root height. position:relative makes it the
-  // containing block for the absolutely-positioned termEl below.
-  // overflow:hidden clips any sub-pixel overhang from canvas sizing.
   termWrapper: {
     flex: 1,
     minHeight: 0,
     position: 'relative',
     overflow: 'hidden',
   },
-  // termEl is absolutely positioned inside termWrapper so it always fills
-  // it exactly and is never in normal flow — xterm's canvas and viewport
-  // cannot push the surrounding layout regardless of content length.
   term: {
     position: 'absolute',
     inset: 0,
