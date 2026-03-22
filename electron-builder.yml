@@ -29,7 +29,7 @@ extraMetadata:
 # Replace 'your-github-org' with your actual GitHub org or username.
 publish:
   provider: github
-  owner: your-github-org
+  owner: jasonfr0
   repo: enput-vps-manager
   releaseType: release   # 'draft' | 'prerelease' | 'release'
 
