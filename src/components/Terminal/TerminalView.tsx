@@ -70,8 +70,17 @@ export function TerminalView({ connId }: TerminalViewProps) {
     }
 
     // ── Size sync ─────────────────────────────────────────────────────────
+    // We measure available height as (viewport bottom − wrapper top) rather
+    // than relying on the CSS-computed height of the container.  This is
+    // the same viewport-anchored value the ResizeObserver sees after a
+    // minimize→maximize, and it guarantees the terminal never extends below
+    // the visible window regardless of any flex/absolute layout quirks.
     const syncSize = () => {
-      fitAddon.fit()
+      const rect = wrapper.getBoundingClientRect()
+      if (rect.width <= 0) return
+      const h = Math.max(1, Math.floor(window.innerHeight - rect.top))
+      termEl.style.height = `${h}px`   // explicit integer px so FitAddon reads
+      fitAddon.fit()                    // the correct height from getComputedStyle
       scrollToBottom()
       // One extra frame covers xterm's post-resize canvas repaint.
       requestAnimationFrame(scrollToBottom)
@@ -143,11 +152,13 @@ const styles: Record<string, React.CSSProperties> = {
     overflow: 'hidden',
     background: '#1a1b2e',
   },
-  // Absolutely positioned so it fills wrapper exactly and never
-  // participates in normal document flow.
+  // position: absolute with top/left/right set, but NO bottom — height is
+  // set imperatively in syncSize so the JS value isn't overridden by CSS.
   term: {
     position: 'absolute',
-    inset: 0,
+    top: 0,
+    left: 0,
+    right: 0,
     overflow: 'hidden',
   },
   loading: {

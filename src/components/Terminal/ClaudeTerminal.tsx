@@ -75,9 +75,12 @@ export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
 
     // ── Size sync ─────────────────────────────────────────────────────────
     const syncSize = () => {
+      const rect = wrapper.getBoundingClientRect()
+      if (rect.width <= 0) return
+      const h = Math.max(1, Math.floor(window.innerHeight - rect.top))
+      termEl.style.height = `${h}px`
       fitAddon.fit()
       scrollToBottom()
-      // One extra frame covers xterm's post-resize canvas repaint.
       requestAnimationFrame(scrollToBottom)
       if (shellIdRef.current) {
         window.api.terminal.resize(connId, shellIdRef.current, terminal.cols, terminal.rows)
@@ -272,8 +275,11 @@ const styles: Record<string, React.CSSProperties> = {
   },
   term: {
     position: 'absolute',
-    inset: 0,
+    top: 0,
+    left: 0,
+    right: 0,
     overflow: 'hidden',
+    // height set imperatively by syncSize — no bottom/inset so JS height wins
   },
   loading: {
     position: 'absolute',
