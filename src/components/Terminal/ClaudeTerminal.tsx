@@ -22,7 +22,7 @@ export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
   const [isReady, setIsReady] = useState(false)
   const { terminalFontSize, terminalScrollback, terminalCursorStyle, terminalCursorBlink } = useSettingsStore()
   const [claudeStatus, setClaudeStatus] = useState<
-    'checking' | 'not-installed' | 'launching' | 'running' | 'error'
+    'checking' | 'ready' | 'not-installed' | 'launching' | 'running' | 'error'
   >('checking')
   const [loadingMsg, setLoadingMsg] = useState('Connecting to VPS…')
 
@@ -172,13 +172,10 @@ export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
         outputBuffer += data
         if (outputBuffer.includes('CLAUDE_FOUND')) {
           hasChecked = true
-          setClaudeStatus('launching')
-          setTimeout(() => {
-            // cd into the chosen directory then launch claude
-            const dir = workingDirRef.current || '~'
-            window.api.terminal.write(connId, shellIdRef.current!, `cd ${dir} && claude\n`)
-            setClaudeStatus('running')
-          }, 300)
+          // Don't auto-launch — let the user pick a working directory first
+          setClaudeStatus('ready')
+          terminal.writeln('\r\n\x1b[1;32m✓ Claude Code is installed.\x1b[0m')
+          terminal.writeln('\x1b[2mSelect a working directory above, then click \x1b[0m\x1b[1mLaunch Claude\x1b[0m\x1b[2m.\x1b[0m\r\n')
         } else if (outputBuffer.includes('CLAUDE_NOT_FOUND')) {
           hasChecked = true
           setClaudeStatus('not-installed')
@@ -257,11 +254,13 @@ export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
             ...styles.statusBadge,
             background:
               claudeStatus === 'running'       ? 'var(--success)' :
+              claudeStatus === 'ready'         ? 'var(--accent)'  :
               claudeStatus === 'not-installed' ? 'var(--warning)' :
               claudeStatus === 'error'         ? 'var(--error)'   :
               'var(--text-muted)',
           }}>
             {claudeStatus === 'checking'      ? 'Checking…'     :
+             claudeStatus === 'ready'         ? 'Ready'         :
              claudeStatus === 'not-installed' ? 'Not Installed'  :
              claudeStatus === 'launching'     ? 'Launching…'    :
              claudeStatus === 'running'       ? 'Running'       : 'Error'}
@@ -271,6 +270,11 @@ export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
           {claudeStatus === 'not-installed' && (
             <button style={styles.actionBtn} onClick={handleInstallClaude}>
               Install Claude Code
+            </button>
+          )}
+          {claudeStatus === 'ready' && (
+            <button style={styles.actionBtn} onClick={handleLaunchClaude}>
+              Launch Claude ✨
             </button>
           )}
           {(claudeStatus === 'not-installed' || claudeStatus === 'checking') && (
