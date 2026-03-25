@@ -1,6 +1,6 @@
 {
   "name": "enput-vps-manager",
-  "version": "3.0.0",
+  "version": "4.0.0",
   "description": "A GUI desktop application for managing VPS servers via SSH/SFTP with Claude Code integration",
   "main": "dist/electron/main.js",
   "author": "Enput",
