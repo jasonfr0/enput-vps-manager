@@ -17,9 +17,10 @@ export function TerminalView({ connId }: TerminalViewProps) {
   const { terminalFontSize, terminalScrollback, terminalCursorStyle, terminalCursorBlink } = useSettingsStore()
 
   // useLayoutEffect fires synchronously after the DOM is mutated but BEFORE
-  // the browser paints. At this point the CSS layout is fully resolved, so
-  // termEl.offsetHeight is the true rendered height — no animation-frame
-  // delays needed, and FitAddon gets the correct rows/cols immediately.
+  // the browser paints. We defer the first syncSize() to a requestAnimationFrame
+  // so the browser's flex layout is fully resolved before FitAddon measures
+  // the container. This matches the timing used by the ResizeObserver
+  // (which is why minimize→maximize always corrects the size).
   useLayoutEffect(() => {
     const wrapper = wrapperRef.current
     const termEl  = termRef.current
@@ -69,8 +70,6 @@ export function TerminalView({ connId }: TerminalViewProps) {
     }
 
     // ── Size sync ─────────────────────────────────────────────────────────
-    // Dimensions are resolved because we're in useLayoutEffect, so we call
-    // fit() immediately — no animation-frame dancing required.
     const syncSize = () => {
       fitAddon.fit()
       scrollToBottom()
@@ -81,7 +80,10 @@ export function TerminalView({ connId }: TerminalViewProps) {
       }
     }
 
-    syncSize()
+    // Defer the initial fit to the next animation frame so the browser has
+    // fully resolved flex layout (the same timing path ResizeObserver uses,
+    // which is why minimize→maximize always fixes sizing).
+    requestAnimationFrame(syncSize)
 
     // Re-fit whenever the wrapper changes size (window resize, sidebar, etc.)
     const ro = new ResizeObserver(syncSize)
