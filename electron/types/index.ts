@@ -153,7 +153,7 @@ export const IPC_CHANNELS = {
   AUDIT_CLEAR:     'audit:clear',
   AUDIT_EXPORT_CSV:'audit:exportCsv',
 
-  // User / team management
+  // User / team management (local)
   USER_IS_EMPTY:        'user:isEmpty',
   USER_AUTHENTICATE:    'user:authenticate',
   USER_LIST:            'user:list',
@@ -161,4 +161,21 @@ export const IPC_CHANNELS = {
   USER_UPDATE:          'user:update',
   USER_DELETE:          'user:delete',
   USER_CHANGE_PASSWORD: 'user:changePassword',
+
+  // Remote auth server
+  AUTH_SET_URL:              'auth:setUrl',
+  AUTH_GET_URL:              'auth:getUrl',
+  AUTH_TEST:                 'auth:test',
+  AUTH_REMOTE_LOGIN:         'auth:remoteLogin',
+  AUTH_REMOTE_REFRESH:       'auth:remoteRefresh',
+  AUTH_REMOTE_LOGOUT:        'auth:remoteLogout',
+  AUTH_REMOTE_LIST_USERS:    'auth:remoteListUsers',
+  AUTH_REMOTE_CREATE_USER:   'auth:remoteCreateUser',
+  AUTH_REMOTE_UPDATE_USER:   'auth:remoteUpdateUser',
+  AUTH_REMOTE_DELETE_USER:   'auth:remoteDeleteUser',
+  AUTH_REMOTE_CHANGE_PW:     'auth:remoteChangePassword',
+  AUTH_REMOTE_LIST_SERVERS:  'auth:remoteListServers',
+  AUTH_REMOTE_CREATE_SERVER: 'auth:remoteCreateServer',
+  AUTH_REMOTE_UPDATE_SERVER: 'auth:remoteUpdateServer',
+  AUTH_REMOTE_DELETE_SERVER: 'auth:remoteDeleteServer',
 } as const

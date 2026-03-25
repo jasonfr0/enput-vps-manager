@@ -89,6 +89,42 @@ export interface ElectronAPI {
     clear: () => Promise<void>
     exportCsv: () => Promise<string>
   }
+  authServer: {
+    /** Persist the auth server base URL */
+    setUrl: (url: string) => Promise<void>
+    /** Retrieve the saved auth server base URL (empty string if not set) */
+    getUrl: () => Promise<string>
+    /** Ping the server to verify connectivity */
+    test: () => Promise<{ ok: boolean; latencyMs: number }>
+    /** Authenticate and receive tokens; tokens stored in OS safe-storage */
+    login: (username: string, password: string) => Promise<{ user: RemoteUser }>
+    /** Exchange the stored refresh token for a new pair; returns null if no session */
+    refresh: () => Promise<{ user: RemoteUser } | null>
+    /** Revoke the current refresh token and clear the local session */
+    logout: () => Promise<void>
+    // ── User management (admin only) ───────────────────────────────────────
+    listUsers: () => Promise<RemoteUser[]>
+    createUser: (
+      username: string,
+      password: string,
+      role: UserRole,
+      serverAccess: string[] | '*'
+    ) => Promise<RemoteUser>
+    updateUser: (id: string, changes: { role?: UserRole; serverAccess?: string[] | '*' }) => Promise<RemoteUser>
+    deleteUser: (id: string) => Promise<void>
+    changePassword: (id: string, newPassword: string) => Promise<void>
+    // ── Server registry (shared, non-sensitive) ────────────────────────────
+    listServers: () => Promise<RemoteServer[]>
+    createServer: (
+      name: string,
+      host: string,
+      port: number,
+      username: string,
+      authType: string
+    ) => Promise<RemoteServer>
+    updateServer: (id: string, changes: Partial<RemoteServer>) => Promise<RemoteServer>
+    deleteServer: (id: string) => Promise<void>
+  }
 }
 
 export type UserRole = 'admin' | 'operator' | 'readonly'
@@ -111,6 +147,26 @@ export interface AuditEntry {
   action: string
   details: string
   outcome: 'success' | 'failure'
+}
+
+/** User record returned by the remote auth server */
+export interface RemoteUser {
+  id: string
+  username: string
+  role: UserRole
+  serverAccess: string[] | '*'
+  createdAt: string
+  updatedAt: string
+}
+
+/** Non-sensitive server record synced via the remote auth server */
+export interface RemoteServer {
+  id: string
+  name: string
+  host: string
+  port: number
+  username: string
+  authType: string
 }
 
 declare global {

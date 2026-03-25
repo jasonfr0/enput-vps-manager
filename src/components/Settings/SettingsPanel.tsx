@@ -311,6 +311,11 @@ export function SettingsPanel() {
             </div>
           </Section>
 
+          {/* ── Auth Server ── */}
+          <Section title="Team Auth Server">
+            <AuthServerSection />
+          </Section>
+
           {/* ── About ── */}
           <Section title="About">
             <Row label="Version">
@@ -325,6 +330,102 @@ export function SettingsPanel() {
 
         </div>
       </div>
+    </div>
+  )
+}
+
+// ─── Auth Server Section ──────────────────────────────────────────
+function AuthServerSection() {
+  const [url, setUrl]         = useState('')
+  const [saved, setSaved]     = useState('')
+  const [status, setStatus]   = useState<'idle' | 'testing' | 'ok' | 'error'>('idle')
+  const [message, setMessage] = useState('')
+
+  useEffect(() => {
+    window.api.authServer.getUrl().then((u: string) => {
+      if (u) { setUrl(u); setSaved(u) }
+    })
+  }, [])
+
+  const handleSave = async () => {
+    await window.api.authServer.setUrl(url.trim())
+    setSaved(url.trim())
+    setStatus('idle')
+    setMessage('')
+  }
+
+  const handleTest = async () => {
+    setStatus('testing')
+    setMessage('')
+    try {
+      const result = await window.api.authServer.test()
+      setStatus('ok')
+      setMessage(result.needsSetup
+        ? 'Connected — server needs initial setup (open vpsadmin.enputauto.com)'
+        : 'Connected successfully ✓')
+    } catch (e: any) {
+      setStatus('error')
+      setMessage(e?.message ?? 'Connection failed')
+    }
+  }
+
+  const handleClear = async () => {
+    await window.api.authServer.setUrl('')
+    setUrl(''); setSaved(''); setStatus('idle'); setMessage('')
+  }
+
+  return (
+    <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+      <p style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+        Connect to a shared auth server so your whole team can log in from their own machines.
+        Leave blank to use local accounts only.
+      </p>
+      <div style={{ display: 'flex', gap: '8px' }}>
+        <input
+          style={{ flex: 1, padding: '7px 10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', fontFamily: 'var(--font-mono)' }}
+          placeholder="https://vpsadmin.enputauto.com"
+          value={url}
+          onChange={e => setUrl(e.target.value)}
+        />
+        <button
+          style={{ padding: '6px 12px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', background: 'transparent', color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer' }}
+          onClick={handleSave}
+          disabled={url.trim() === saved}
+        >
+          Save
+        </button>
+        <button
+          style={{ padding: '6px 12px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', background: 'transparent', color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer' }}
+          onClick={handleTest}
+          disabled={!url.trim() || status === 'testing'}
+        >
+          {status === 'testing' ? 'Testing…' : 'Test'}
+        </button>
+        {saved && (
+          <button
+            style={{ padding: '6px 12px', border: '1px solid rgba(244,67,54,.4)', borderRadius: 'var(--radius-sm)', background: 'transparent', color: '#f44336', fontSize: '12px', cursor: 'pointer' }}
+            onClick={handleClear}
+          >
+            Clear
+          </button>
+        )}
+      </div>
+      {message && (
+        <div style={{
+          fontSize: '12px', padding: '7px 10px', borderRadius: 'var(--radius-sm)',
+          background: status === 'ok' ? 'rgba(76,175,80,.1)' : 'rgba(244,67,54,.1)',
+          color:      status === 'ok' ? '#4caf50'           : '#f44336',
+          border: `1px solid ${status === 'ok' ? 'rgba(76,175,80,.3)' : 'rgba(244,67,54,.3)'}`,
+        }}>
+          {message}
+        </div>
+      )}
+      {saved && (
+        <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+          Active: <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>{saved}</span>
+          &ensp;— Restart the app for auth server changes to take full effect.
+        </p>
+      )}
     </div>
   )
 }

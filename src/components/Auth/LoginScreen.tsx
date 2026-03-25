@@ -1,4 +1,4 @@
-import React, { FormEvent, useState } from 'react'
+import React, { FormEvent, useEffect, useState } from 'react'
 import { useSessionStore } from '../../context/useSessionStore'
 
 interface LoginScreenProps {
@@ -7,23 +7,78 @@ interface LoginScreenProps {
   onSetupDone?: () => void
 }
 
+type AuthMode = 'detecting' | 'local' | 'remote'
+
 export function LoginScreen({ setupMode = false, onSetupDone }: LoginScreenProps) {
   const setCurrentUser = useSessionStore((s) => s.setCurrentUser)
+  const setRemote      = useSessionStore((s) => s.setRemote)
 
-  // Login state
+  // Auth mode detection
+  const [authMode, setAuthMode]         = useState<AuthMode>('detecting')
+  const [serverUrl, setServerUrl]       = useState<string>('')
+  const [silentChecking, setSilentCheck] = useState(false)
+
+  // Shared form state
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError]       = useState('')
   const [busy, setBusy]         = useState(false)
 
-  // Setup state (first run)
+  // Setup state (first run, local mode only)
   const [setupUsername, setSetupUsername] = useState('admin')
   const [setupPassword, setSetupPassword] = useState('')
   const [setupConfirm, setSetupConfirm]   = useState('')
   const [setupError, setSetupError]       = useState('')
   const [setupBusy, setSetupBusy]         = useState(false)
 
-  const handleLogin = async (e: FormEvent) => {
+  // On mount: detect whether a remote auth server is configured
+  useEffect(() => {
+    if (setupMode) {
+      setAuthMode('local')
+      return
+    }
+
+    let cancelled = false
+
+    async function detectMode() {
+      try {
+        const url = await window.api.authServer.getUrl()
+        if (cancelled) return
+
+        if (url) {
+          setServerUrl(url)
+          setAuthMode('remote')
+
+          // Attempt silent token refresh for auto-login
+          setSilentCheck(true)
+          try {
+            const result = await window.api.authServer.refresh()
+            if (cancelled) return
+            if (result?.user) {
+              setRemote(true)
+              setCurrentUser(result.user as any)
+              // App.tsx will unmount us once currentUser is set
+              return
+            }
+          } catch {
+            // Refresh failed — show remote login form
+          } finally {
+            if (!cancelled) setSilentCheck(false)
+          }
+        } else {
+          setAuthMode('local')
+        }
+      } catch {
+        if (!cancelled) setAuthMode('local')
+      }
+    }
+
+    detectMode()
+    return () => { cancelled = true }
+  }, [setupMode]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── LOCAL LOGIN ────────────────────────────────────────────────────────────
+  const handleLocalLogin = async (e: FormEvent) => {
     e.preventDefault()
     if (!username.trim() || !password) return
     setBusy(true)
@@ -38,6 +93,24 @@ export function LoginScreen({ setupMode = false, onSetupDone }: LoginScreenProps
     }
   }
 
+  // ── REMOTE LOGIN ───────────────────────────────────────────────────────────
+  const handleRemoteLogin = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!username.trim() || !password) return
+    setBusy(true)
+    setError('')
+    try {
+      const result = await window.api.authServer.login(username.trim(), password)
+      setRemote(true)
+      setCurrentUser(result.user as any)
+    } catch (err: any) {
+      setError(err?.message ?? 'Login failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // ── FIRST-RUN SETUP ────────────────────────────────────────────────────────
   const handleSetup = async (e: FormEvent) => {
     e.preventDefault()
     setSetupError('')
@@ -61,6 +134,25 @@ export function LoginScreen({ setupMode = false, onSetupDone }: LoginScreenProps
     }
   }
 
+  // ── RENDER: detecting / silent refresh ────────────────────────────────────
+  if (authMode === 'detecting' || silentChecking) {
+    return (
+      <div style={styles.overlay}>
+        <div style={{ ...styles.card, textAlign: 'center' }}>
+          <div style={styles.logoRow}>
+            <span style={styles.logoIcon}>⚡</span>
+            <span style={styles.logoText}>Enput VPS</span>
+          </div>
+          <div style={styles.spinner}>◌</div>
+          <p style={{ ...styles.sub, marginTop: '12px' }}>
+            {silentChecking ? 'Restoring session…' : 'Checking configuration…'}
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  // ── RENDER: first-run setup ────────────────────────────────────────────────
   if (setupMode) {
     return (
       <div style={styles.overlay}>
@@ -111,6 +203,55 @@ export function LoginScreen({ setupMode = false, onSetupDone }: LoginScreenProps
     )
   }
 
+  // ── RENDER: remote login ───────────────────────────────────────────────────
+  if (authMode === 'remote') {
+    return (
+      <div style={styles.overlay}>
+        <div style={styles.card}>
+          <div style={styles.logoRow}>
+            <span style={styles.logoIcon}>⚡</span>
+            <span style={styles.logoText}>Enput VPS</span>
+          </div>
+          <h1 style={styles.heading}>Sign in</h1>
+          <div style={styles.serverBadge}>
+            <span style={styles.serverBadgeDot} />
+            <span style={styles.serverBadgeText} title={serverUrl}>
+              {serverUrl.replace(/^https?:\/\//, '')}
+            </span>
+          </div>
+          <form onSubmit={handleRemoteLogin} style={styles.form}>
+            <label style={styles.label}>Username</label>
+            <input
+              style={styles.input}
+              value={username}
+              onChange={e => setUsername(e.target.value)}
+              autoFocus
+              autoComplete="username"
+              disabled={busy}
+            />
+            <label style={styles.label}>Password</label>
+            <input
+              style={styles.input}
+              type="password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              autoComplete="current-password"
+              disabled={busy}
+            />
+            {error && <div style={styles.error}>{error}</div>}
+            <button style={styles.btn} type="submit" disabled={busy || !username.trim() || !password}>
+              {busy ? 'Signing in…' : 'Sign in'}
+            </button>
+          </form>
+          <p style={styles.modeNote}>
+            Authenticated via team server
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  // ── RENDER: local login ────────────────────────────────────────────────────
   return (
     <div style={styles.overlay}>
       <div style={styles.card}>
@@ -119,7 +260,7 @@ export function LoginScreen({ setupMode = false, onSetupDone }: LoginScreenProps
           <span style={styles.logoText}>Enput VPS</span>
         </div>
         <h1 style={styles.heading}>Sign in</h1>
-        <form onSubmit={handleLogin} style={styles.form}>
+        <form onSubmit={handleLocalLogin} style={styles.form}>
           <label style={styles.label}>Username</label>
           <input
             style={styles.input}
@@ -183,7 +324,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '20px',
     fontWeight: 700,
     color: 'var(--text-primary)',
-    margin: '0 0 6px',
+    margin: '0 0 10px',
   },
   sub: {
     fontSize: '13px',
@@ -235,5 +376,47 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     cursor: 'pointer',
     opacity: 1,
+  },
+  serverBadge: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    marginBottom: '16px',
+    padding: '5px 10px',
+    background: 'rgba(99,102,241,0.1)',
+    border: '1px solid rgba(99,102,241,0.25)',
+    borderRadius: '20px',
+    width: 'fit-content',
+    maxWidth: '100%',
+    overflow: 'hidden',
+  },
+  serverBadgeDot: {
+    width: '6px',
+    height: '6px',
+    borderRadius: '50%',
+    background: '#6366f1',
+    flexShrink: 0,
+  },
+  serverBadgeText: {
+    fontSize: '11px',
+    color: '#818cf8',
+    fontFamily: 'monospace',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  modeNote: {
+    fontSize: '11px',
+    color: 'var(--text-muted)',
+    textAlign: 'center',
+    marginTop: '16px',
+    marginBottom: 0,
+  },
+  spinner: {
+    fontSize: '32px',
+    color: 'var(--accent)',
+    animation: 'spin 1s linear infinite',
+    display: 'inline-block',
+    marginTop: '12px',
   },
 }

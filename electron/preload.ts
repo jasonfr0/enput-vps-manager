@@ -196,6 +196,40 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke(IPC_CHANNELS.USER_CHANGE_PASSWORD, { id, newPassword }),
   },
 
+  // Remote auth server
+  authServer: {
+    setUrl: (url: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.AUTH_SET_URL, { url }),
+    getUrl: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.AUTH_GET_URL),
+    test: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.AUTH_TEST),
+    login: (username: string, password: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.AUTH_REMOTE_LOGIN, { username, password }),
+    refresh: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.AUTH_REMOTE_REFRESH),
+    logout: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.AUTH_REMOTE_LOGOUT),
+    listUsers: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.AUTH_REMOTE_LIST_USERS),
+    createUser: (username: string, password: string, role: string, serverAccess: string[] | '*') =>
+      ipcRenderer.invoke(IPC_CHANNELS.AUTH_REMOTE_CREATE_USER, { username, password, role, serverAccess }),
+    updateUser: (id: string, changes: any) =>
+      ipcRenderer.invoke(IPC_CHANNELS.AUTH_REMOTE_UPDATE_USER, { id, changes }),
+    deleteUser: (id: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.AUTH_REMOTE_DELETE_USER, { id }),
+    changePassword: (id: string, newPassword: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.AUTH_REMOTE_CHANGE_PW, { id, newPassword }),
+    listServers: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.AUTH_REMOTE_LIST_SERVERS),
+    createServer: (name: string, host: string, port: number, username: string, authType: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.AUTH_REMOTE_CREATE_SERVER, { name, host, port, username, authType }),
+    updateServer: (id: string, changes: any) =>
+      ipcRenderer.invoke(IPC_CHANNELS.AUTH_REMOTE_UPDATE_SERVER, { id, changes }),
+    deleteServer: (id: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.AUTH_REMOTE_DELETE_SERVER, { id }),
+  },
+
   // Audit log
   audit: {
     getEntries: (filter?: any) =>

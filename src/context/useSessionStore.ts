@@ -7,9 +7,12 @@ interface SessionState {
   bootstrapped: boolean
   /** True if the user store is empty (first-run setup needed) */
   needsSetup: boolean
+  /** True when the current session is authenticated against a remote auth server */
+  isRemote: boolean
 
   setCurrentUser: (user: TeamUser | null) => void
   setBootstrapped: (needsSetup: boolean) => void
+  setRemote: (val: boolean) => void
   logout: () => void
 
   /** Convenience helpers */
@@ -24,10 +27,12 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   currentUser: null,
   bootstrapped: false,
   needsSetup: false,
+  isRemote: false,
 
   setCurrentUser: (user) => set({ currentUser: user }),
   setBootstrapped: (needsSetup) => set({ bootstrapped: true, needsSetup }),
-  logout: () => set({ currentUser: null }),
+  setRemote: (val) => set({ isRemote: val }),
+  logout: () => set({ currentUser: null, isRemote: false }),
 
   isAdmin: () => get().currentUser?.role === 'admin',
   isOperator: () => {

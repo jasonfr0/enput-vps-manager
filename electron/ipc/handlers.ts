@@ -8,6 +8,7 @@ import { SSHKeyManager } from '../managers/SSHKeyManager'
 import { UpdateManager } from '../managers/UpdateManager'
 import { AuditManager, AuditFilter } from '../managers/AuditManager'
 import { UserManager } from '../managers/UserManager'
+import { AuthServerManager } from '../managers/AuthServerManager'
 import { IPC_CHANNELS, ServerConfig } from '../types'
 import log from 'electron-log'
 
@@ -21,7 +22,8 @@ export function registerIpcHandlers(
   sshKeyManager: SSHKeyManager,
   updateManager: UpdateManager,
   auditManager: AuditManager,
-  userManager: UserManager
+  userManager: UserManager,
+  authServerManager: AuthServerManager
 ): void {
   // --- SSH Handlers ---
 
@@ -458,6 +460,70 @@ export function registerIpcHandlers(
 
   ipcMain.handle(IPC_CHANNELS.USER_CHANGE_PASSWORD, async (_, { id, newPassword }) => {
     await userManager.changePassword(id, newPassword)
+  })
+
+  // --- Remote Auth Server Handlers ---
+
+  ipcMain.handle(IPC_CHANNELS.AUTH_SET_URL, (_, { url }) => {
+    authServerManager.setBaseUrl(url)
+    // Persist to settings so it survives restarts
+    credentialManager.setSetting('auth_server_url', url)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.AUTH_GET_URL, () => {
+    return authServerManager.getBaseUrl()
+  })
+
+  ipcMain.handle(IPC_CHANNELS.AUTH_TEST, async () => {
+    return authServerManager.testConnection()
+  })
+
+  ipcMain.handle(IPC_CHANNELS.AUTH_REMOTE_LOGIN, async (_, { username, password }) => {
+    return authServerManager.login(username, password)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.AUTH_REMOTE_REFRESH, async () => {
+    return authServerManager.tryRefresh()
+  })
+
+  ipcMain.handle(IPC_CHANNELS.AUTH_REMOTE_LOGOUT, async () => {
+    return authServerManager.logout()
+  })
+
+  ipcMain.handle(IPC_CHANNELS.AUTH_REMOTE_LIST_USERS, async () => {
+    return authServerManager.listUsers()
+  })
+
+  ipcMain.handle(IPC_CHANNELS.AUTH_REMOTE_CREATE_USER, async (_, { username, password, role, serverAccess }) => {
+    return authServerManager.createUser(username, password, role, serverAccess)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.AUTH_REMOTE_UPDATE_USER, async (_, { id, changes }) => {
+    return authServerManager.updateUser(id, changes)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.AUTH_REMOTE_DELETE_USER, async (_, { id }) => {
+    return authServerManager.deleteUser(id)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.AUTH_REMOTE_CHANGE_PW, async (_, { id, newPassword }) => {
+    return authServerManager.changePassword(id, newPassword)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.AUTH_REMOTE_LIST_SERVERS, async () => {
+    return authServerManager.listServers()
+  })
+
+  ipcMain.handle(IPC_CHANNELS.AUTH_REMOTE_CREATE_SERVER, async (_, { name, host, port, username, authType }) => {
+    return authServerManager.createServer(name, host, port, username, authType)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.AUTH_REMOTE_UPDATE_SERVER, async (_, { id, changes }) => {
+    return authServerManager.updateServer(id, changes)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.AUTH_REMOTE_DELETE_SERVER, async (_, { id }) => {
+    return authServerManager.deleteServer(id)
   })
 
   log.info('IPC handlers registered')

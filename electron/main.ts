@@ -9,6 +9,7 @@ import { SSHKeyManager } from './managers/SSHKeyManager'
 import { UpdateManager } from './managers/UpdateManager'
 import { AuditManager } from './managers/AuditManager'
 import { UserManager } from './managers/UserManager'
+import { AuthServerManager } from './managers/AuthServerManager'
 import { registerIpcHandlers } from './ipc/handlers'
 import log from 'electron-log'
 
@@ -26,6 +27,11 @@ const sshKeyManager = new SSHKeyManager()
 const updateManager = new UpdateManager()
 const auditManager = new AuditManager()
 const userManager = new UserManager()
+const authServerManager = new AuthServerManager()
+
+// Restore saved auth server URL from settings
+const savedAuthUrl = credentialManager.getSetting<string>('auth_server_url', '')
+if (savedAuthUrl) authServerManager.setBaseUrl(savedAuthUrl)
 
 // Load saved API key
 const savedApiKey = credentialManager.getSetting<string | null>('claude_api_key', null)
@@ -80,7 +86,8 @@ function createWindow(): void {
     sshKeyManager,
     updateManager,
     auditManager,
-    userManager
+    userManager,
+    authServerManager
   )
 
   // Load the app
