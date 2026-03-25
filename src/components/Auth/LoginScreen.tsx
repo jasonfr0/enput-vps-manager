@@ -1,4 +1,4 @@
-import React, { FormEvent, useEffect, useState } from 'react'
+import React, { FormEvent, useEffect, useRef, useState } from 'react'
 import { useSessionStore } from '../../context/useSessionStore'
 
 interface LoginScreenProps {
@@ -17,6 +17,13 @@ export function LoginScreen({ setupMode = false, onSetupDone }: LoginScreenProps
   const [authMode, setAuthMode]         = useState<AuthMode>('detecting')
   const [serverUrl, setServerUrl]       = useState<string>('')
   const [silentChecking, setSilentCheck] = useState(false)
+
+  // "Use auth server" inline configurator (shown on local login screen)
+  const [showUrlInput, setShowUrlInput]   = useState(false)
+  const [urlInputVal, setUrlInputVal]     = useState('')
+  const [urlSaving, setUrlSaving]         = useState(false)
+  const [urlError, setUrlError]           = useState('')
+  const detectRef = useRef<() => void>()
 
   // Shared form state
   const [username, setUsername] = useState('')
@@ -41,6 +48,7 @@ export function LoginScreen({ setupMode = false, onSetupDone }: LoginScreenProps
     let cancelled = false
 
     async function detectMode() {
+      setAuthMode('detecting')
       try {
         const url = await window.api.authServer.getUrl()
         if (cancelled) return
@@ -57,7 +65,6 @@ export function LoginScreen({ setupMode = false, onSetupDone }: LoginScreenProps
             if (result?.user) {
               setRemote(true)
               setCurrentUser(result.user as any)
-              // App.tsx will unmount us once currentUser is set
               return
             }
           } catch {
@@ -73,9 +80,34 @@ export function LoginScreen({ setupMode = false, onSetupDone }: LoginScreenProps
       }
     }
 
+    // Store ref so the URL-save handler can re-trigger detection
+    detectRef.current = detectMode
+
     detectMode()
     return () => { cancelled = true }
   }, [setupMode]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Save an auth server URL entered directly on the login screen, then re-detect
+  const handleSaveUrl = async () => {
+    const trimmed = urlInputVal.trim().replace(/\/$/, '')
+    if (!trimmed) { setUrlError('Enter a URL'); return }
+    if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
+      setUrlError('URL must start with http:// or https://')
+      return
+    }
+    setUrlSaving(true)
+    setUrlError('')
+    try {
+      await window.api.authServer.setUrl(trimmed)
+      setShowUrlInput(false)
+      setUrlInputVal('')
+      detectRef.current?.()
+    } catch (e: any) {
+      setUrlError(e?.message ?? 'Failed to save')
+    } finally {
+      setUrlSaving(false)
+    }
+  }
 
   // ── LOCAL LOGIN ────────────────────────────────────────────────────────────
   const handleLocalLogin = async (e: FormEvent) => {
@@ -284,6 +316,39 @@ export function LoginScreen({ setupMode = false, onSetupDone }: LoginScreenProps
             {busy ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
+
+        {/* ── Auth server quick-connect ── */}
+        <div style={styles.divider} />
+        {!showUrlInput ? (
+          <button
+            style={styles.linkBtn}
+            onClick={() => { setShowUrlInput(true); setUrlError('') }}
+          >
+            Use a team auth server
+          </button>
+        ) : (
+          <div style={styles.urlBox}>
+            <p style={styles.urlBoxLabel}>Auth server URL</p>
+            <input
+              style={styles.input}
+              placeholder="https://vpsadmin.example.com"
+              value={urlInputVal}
+              onChange={e => setUrlInputVal(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleSaveUrl() } }}
+              autoFocus
+              disabled={urlSaving}
+            />
+            {urlError && <div style={{ ...styles.error, marginTop: '4px' }}>{urlError}</div>}
+            <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+              <button style={styles.btn} onClick={handleSaveUrl} disabled={urlSaving || !urlInputVal.trim()}>
+                {urlSaving ? 'Connecting…' : 'Connect'}
+              </button>
+              <button style={styles.btnGhost} onClick={() => { setShowUrlInput(false); setUrlError('') }}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -366,6 +431,7 @@ const styles: Record<string, React.CSSProperties> = {
     border: '1px solid rgba(244,67,54,0.25)',
   },
   btn: {
+    flex: 1,
     marginTop: '8px',
     padding: '10px 0',
     background: 'var(--accent)',
@@ -376,6 +442,42 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     cursor: 'pointer',
     opacity: 1,
+  },
+  divider: {
+    height: '1px',
+    background: 'var(--border)',
+    margin: '20px 0 12px',
+  },
+  linkBtn: {
+    background: 'none',
+    border: 'none',
+    color: 'var(--text-muted)',
+    fontSize: '12px',
+    cursor: 'pointer',
+    padding: '0',
+    textDecoration: 'underline',
+    textDecorationStyle: 'dotted' as const,
+  },
+  urlBox: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+  },
+  urlBoxLabel: {
+    fontSize: '12px',
+    fontWeight: 500,
+    color: 'var(--text-secondary)',
+    marginBottom: '6px',
+  },
+  btnGhost: {
+    flex: 1,
+    padding: '10px 0',
+    background: 'transparent',
+    color: 'var(--text-muted)',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--radius)',
+    fontSize: '14px',
+    fontWeight: 500,
+    cursor: 'pointer',
   },
   serverBadge: {
     display: 'flex',

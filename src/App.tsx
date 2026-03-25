@@ -29,14 +29,28 @@ export default function App() {
   // Session / auth
   const { currentUser, bootstrapped, needsSetup, setBootstrapped, canAccessServer } = useSessionStore()
 
-  // Check on mount: does the user store have any accounts yet?
+  // Check on mount: remote auth server takes priority over local user store.
+  // If a server URL is already saved, skip the local isEmpty check entirely —
+  // LoginScreen will handle detection + silent refresh for remote mode.
   useEffect(() => {
-    window.api.users.isEmpty().then((empty: boolean) => {
-      setBootstrapped(empty)
-    }).catch(() => {
-      // If IPC fails (e.g. legacy build), skip gating
-      setBootstrapped(false)
-    })
+    async function bootstrap() {
+      try {
+        const url = await window.api.authServer.getUrl()
+        if (url) {
+          // Remote auth configured — skip local setup check
+          setBootstrapped(false) // bootstrapped=true, needsSetup=false → show <LoginScreen />
+          return
+        }
+      } catch {}
+      // No remote URL — fall back to local user store check
+      try {
+        const empty = await window.api.users.isEmpty()
+        setBootstrapped(empty)
+      } catch {
+        setBootstrapped(false)
+      }
+    }
+    bootstrap()
   }, [])
 
   // Use the defaultTab setting as the initial tab on every launch
