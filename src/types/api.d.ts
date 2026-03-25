@@ -16,6 +16,7 @@ export interface ElectronAPI {
     delete: (connId: string, path: string) => Promise<void>
     rename: (connId: string, oldPath: string, newPath: string) => Promise<void>
     mkdir: (connId: string, path: string) => Promise<void>
+    deleteDir: (connId: string, path: string) => Promise<void>
     onTransferProgress: (callback: (data: any) => void) => () => void
   }
   monitor: {
@@ -67,6 +68,29 @@ export interface ElectronAPI {
     install: () => void
     onStatus: (callback: (state: any) => void) => () => void
   }
+  audit: {
+    getEntries: (filter?: {
+      connId?: string
+      category?: string
+      search?: string
+      since?: string
+      until?: string
+      limit?: number
+    }) => Promise<AuditEntry[]>
+    clear: () => Promise<void>
+    exportCsv: () => Promise<string>
+  }
+}
+
+export interface AuditEntry {
+  id: string
+  timestamp: string
+  connId: string
+  serverLabel: string
+  category: 'connection' | 'terminal' | 'file' | 'claude'
+  action: string
+  details: string
+  outcome: 'success' | 'failure'
 }
 
 declare global {

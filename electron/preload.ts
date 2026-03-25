@@ -178,6 +178,16 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke('dialog:saveFile', options),
   },
 
+  // Audit log
+  audit: {
+    getEntries: (filter?: any) =>
+      ipcRenderer.invoke(IPC_CHANNELS.AUDIT_GET, filter),
+    clear: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.AUDIT_CLEAR),
+    exportCsv: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.AUDIT_EXPORT_CSV),
+  },
+
   // Auto-updater
   updater: {
     /** Get the current update state (for rehydration on startup). */

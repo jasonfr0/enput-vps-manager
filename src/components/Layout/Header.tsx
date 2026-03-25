@@ -14,6 +14,7 @@ const tabMeta: Record<ActiveTab, { label: string; icon: string; shortcut: string
   'claude-cli': { label: 'Claude Code CLI',  icon: '✨', shortcut: 'Ctrl+5' },
   monitor:    { label: 'Resource Monitor',   icon: '📊', shortcut: 'Ctrl+6' },
   settings:   { label: 'Settings',           icon: '⚙️', shortcut: 'Ctrl+,' },
+  audit:      { label: 'Audit Log',          icon: '📋', shortcut: 'Ctrl+7' },
 }
 
 function useUptime(connected: boolean) {

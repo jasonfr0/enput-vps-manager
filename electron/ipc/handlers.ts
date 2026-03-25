@@ -6,6 +6,7 @@ import { ResourceMonitor } from '../managers/ResourceMonitor'
 import { ClaudeManager } from '../managers/ClaudeManager'
 import { SSHKeyManager } from '../managers/SSHKeyManager'
 import { UpdateManager } from '../managers/UpdateManager'
+import { AuditManager, AuditFilter } from '../managers/AuditManager'
 import { IPC_CHANNELS, ServerConfig } from '../types'
 import log from 'electron-log'
 
@@ -17,7 +18,8 @@ export function registerIpcHandlers(
   resourceMonitor: ResourceMonitor,
   claudeManager: ClaudeManager,
   sshKeyManager: SSHKeyManager,
-  updateManager: UpdateManager
+  updateManager: UpdateManager,
+  auditManager: AuditManager
 ): void {
   // --- SSH Handlers ---
 
@@ -25,12 +27,39 @@ export function registerIpcHandlers(
     const config = credentialManager.getServer(serverId)
     if (!config) throw new Error(`Server not found: ${serverId}`)
 
-    const state = await sshManager.connect(config)
-    return state
+    try {
+      const state = await sshManager.connect(config)
+      const label = `${config.username}@${config.host}`
+      auditManager.registerConnection(state.id, label)
+      auditManager.log({
+        connId: state.id, serverLabel: label,
+        category: 'connection', action: 'connect',
+        details: `Connected to ${label}:${config.port ?? 22}`,
+        outcome: 'success',
+      })
+      return state
+    } catch (err: any) {
+      const label = `${config.username}@${config.host}`
+      auditManager.log({
+        connId: serverId, serverLabel: label,
+        category: 'connection', action: 'connect',
+        details: `Failed to connect to ${label}: ${err.message}`,
+        outcome: 'failure',
+      })
+      throw err
+    }
   })
 
   ipcMain.handle(IPC_CHANNELS.SSH_DISCONNECT, async (_, { connId }) => {
+    const label = auditManager.getServerLabel(connId)
     await sshManager.disconnect(connId)
+    auditManager.log({
+      connId, serverLabel: label,
+      category: 'connection', action: 'disconnect',
+      details: `Disconnected from ${label}`,
+      outcome: 'success',
+    })
+    auditManager.unregisterConnection(connId)
   })
 
   // Forward SSH state changes to renderer
@@ -72,6 +101,7 @@ export function registerIpcHandlers(
     IPC_CHANNELS.TERMINAL_INPUT,
     (_, { connId, shellId, data }) => {
       sshManager.writeToShell(connId, shellId, data)
+      auditManager.feedInput(connId, shellId, data)
     }
   )
 
@@ -120,7 +150,13 @@ export function registerIpcHandlers(
     async (_, { connId, localPath, remotePath }) => {
       const client = sshManager.getClient(connId)
       if (!client) throw new Error(`No connection: ${connId}`)
-      await sftpManager.uploadFile(connId, client, localPath, remotePath)
+      try {
+        await sftpManager.uploadFile(connId, client, localPath, remotePath)
+        auditManager.log({ connId, serverLabel: auditManager.getServerLabel(connId), category: 'file', action: 'upload', details: remotePath, outcome: 'success' })
+      } catch (err: any) {
+        auditManager.log({ connId, serverLabel: auditManager.getServerLabel(connId), category: 'file', action: 'upload', details: `${remotePath} — ${err.message}`, outcome: 'failure' })
+        throw err
+      }
     }
   )
 
@@ -129,14 +165,26 @@ export function registerIpcHandlers(
     async (_, { connId, remotePath, localPath }) => {
       const client = sshManager.getClient(connId)
       if (!client) throw new Error(`No connection: ${connId}`)
-      await sftpManager.downloadFile(connId, client, remotePath, localPath)
+      try {
+        await sftpManager.downloadFile(connId, client, remotePath, localPath)
+        auditManager.log({ connId, serverLabel: auditManager.getServerLabel(connId), category: 'file', action: 'download', details: remotePath, outcome: 'success' })
+      } catch (err: any) {
+        auditManager.log({ connId, serverLabel: auditManager.getServerLabel(connId), category: 'file', action: 'download', details: `${remotePath} — ${err.message}`, outcome: 'failure' })
+        throw err
+      }
     }
   )
 
   ipcMain.handle(IPC_CHANNELS.SFTP_DELETE, async (_, { connId, path }) => {
     const client = sshManager.getClient(connId)
     if (!client) throw new Error(`No connection: ${connId}`)
-    await sftpManager.deleteFile(connId, client, path)
+    try {
+      await sftpManager.deleteFile(connId, client, path)
+      auditManager.log({ connId, serverLabel: auditManager.getServerLabel(connId), category: 'file', action: 'delete', details: path, outcome: 'success' })
+    } catch (err: any) {
+      auditManager.log({ connId, serverLabel: auditManager.getServerLabel(connId), category: 'file', action: 'delete', details: `${path} — ${err.message}`, outcome: 'failure' })
+      throw err
+    }
   })
 
   ipcMain.handle(
@@ -144,20 +192,38 @@ export function registerIpcHandlers(
     async (_, { connId, oldPath, newPath }) => {
       const client = sshManager.getClient(connId)
       if (!client) throw new Error(`No connection: ${connId}`)
-      await sftpManager.rename(connId, client, oldPath, newPath)
+      try {
+        await sftpManager.rename(connId, client, oldPath, newPath)
+        auditManager.log({ connId, serverLabel: auditManager.getServerLabel(connId), category: 'file', action: 'rename', details: `${oldPath} → ${newPath}`, outcome: 'success' })
+      } catch (err: any) {
+        auditManager.log({ connId, serverLabel: auditManager.getServerLabel(connId), category: 'file', action: 'rename', details: `${oldPath} → ${newPath} — ${err.message}`, outcome: 'failure' })
+        throw err
+      }
     }
   )
 
   ipcMain.handle(IPC_CHANNELS.SFTP_MKDIR, async (_, { connId, path }) => {
     const client = sshManager.getClient(connId)
     if (!client) throw new Error(`No connection: ${connId}`)
-    await sftpManager.mkdir(connId, client, path)
+    try {
+      await sftpManager.mkdir(connId, client, path)
+      auditManager.log({ connId, serverLabel: auditManager.getServerLabel(connId), category: 'file', action: 'mkdir', details: path, outcome: 'success' })
+    } catch (err: any) {
+      auditManager.log({ connId, serverLabel: auditManager.getServerLabel(connId), category: 'file', action: 'mkdir', details: `${path} — ${err.message}`, outcome: 'failure' })
+      throw err
+    }
   })
 
   ipcMain.handle(IPC_CHANNELS.SFTP_DELETE_DIR, async (_, { connId, path }) => {
     const client = sshManager.getClient(connId)
     if (!client) throw new Error(`No connection: ${connId}`)
-    await sftpManager.deleteDirectory(connId, client, path)
+    try {
+      await sftpManager.deleteDirectory(connId, client, path)
+      auditManager.log({ connId, serverLabel: auditManager.getServerLabel(connId), category: 'file', action: 'delete-dir', details: path, outcome: 'success' })
+    } catch (err: any) {
+      auditManager.log({ connId, serverLabel: auditManager.getServerLabel(connId), category: 'file', action: 'delete-dir', details: `${path} — ${err.message}`, outcome: 'failure' })
+      throw err
+    }
   })
 
   // Forward transfer progress to renderer
@@ -344,6 +410,20 @@ export function registerIpcHandlers(
   // User clicked "Restart & Install"
   ipcMain.on(IPC_CHANNELS.UPDATE_INSTALL, () => {
     updateManager.quitAndInstall()
+  })
+
+  // --- Audit Log Handlers ---
+
+  ipcMain.handle(IPC_CHANNELS.AUDIT_GET, async (_, filter) => {
+    return auditManager.getEntries(filter)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.AUDIT_CLEAR, async () => {
+    auditManager.clearAll()
+  })
+
+  ipcMain.handle(IPC_CHANNELS.AUDIT_EXPORT_CSV, async () => {
+    return auditManager.exportCsv()
   })
 
   log.info('IPC handlers registered')

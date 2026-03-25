@@ -146,4 +146,10 @@ export const IPC_CHANNELS = {
   UPDATE_INSTALL:  'update:install',
   UPDATE_GET:      'update:get',
   UPDATE_STATUS:   'update:status',   // main → renderer push
+
+  // Audit log
+  AUDIT_GET:       'audit:get',
+  AUDIT_LOG:       'audit:log',
+  AUDIT_CLEAR:     'audit:clear',
+  AUDIT_EXPORT_CSV:'audit:exportCsv',
 } as const

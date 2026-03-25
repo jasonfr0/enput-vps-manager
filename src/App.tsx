@@ -8,6 +8,7 @@ import { ChatInterface } from './components/Chat/ChatInterface'
 import { ClaudeTerminal } from './components/Terminal/ClaudeTerminal'
 import { ResourceMonitor } from './components/Dashboard/ResourceMonitor'
 import { SettingsPanel } from './components/Settings/SettingsPanel'
+import { AuditLog } from './components/Audit/AuditLog'
 import { AddServerModal } from './components/ServerManager/AddServerModal'
 import { ToastContainer } from './components/UI/ToastContainer'
 import { UpdateBanner } from './components/UI/UpdateBanner'
@@ -16,9 +17,9 @@ import { useSettingsStore } from './context/useSettingsStore'
 import { useUpdateStore } from './context/useUpdateStore'
 import { notify } from './context/useNotificationStore'
 
-export type ActiveTab = 'terminal' | 'files' | 'editor' | 'chat' | 'claude-cli' | 'monitor' | 'settings'
+export type ActiveTab = 'terminal' | 'files' | 'editor' | 'chat' | 'claude-cli' | 'monitor' | 'settings' | 'audit'
 
-const TAB_ORDER: ActiveTab[] = ['terminal', 'files', 'editor', 'chat', 'claude-cli', 'monitor']
+const TAB_ORDER: ActiveTab[] = ['terminal', 'files', 'editor', 'chat', 'claude-cli', 'monitor', 'audit']
 const LAST_SERVER_KEY = 'enput_last_server'
 
 export default function App() {
@@ -45,7 +46,7 @@ export default function App() {
     })
   }, [])
 
-  // Ctrl+1–6 tab shortcuts + Ctrl+, for settings
+  // Ctrl+1–7 tab shortcuts + Ctrl+, for settings
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!e.ctrlKey && !e.metaKey) return
@@ -142,8 +143,9 @@ export default function App() {
   }
 
   const renderActiveTab = () => {
-    // Settings is always available regardless of connection
+    // Settings and Audit are always available regardless of connection
     if (activeTab === 'settings') return <SettingsPanel />
+    if (activeTab === 'audit') return <AuditLog />
 
     if (!activeConnId || connectionStatus !== 'connected') {
       return (

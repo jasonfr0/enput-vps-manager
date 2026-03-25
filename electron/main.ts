@@ -7,6 +7,7 @@ import { ResourceMonitor } from './managers/ResourceMonitor'
 import { ClaudeManager } from './managers/ClaudeManager'
 import { SSHKeyManager } from './managers/SSHKeyManager'
 import { UpdateManager } from './managers/UpdateManager'
+import { AuditManager } from './managers/AuditManager'
 import { registerIpcHandlers } from './ipc/handlers'
 import log from 'electron-log'
 
@@ -22,6 +23,7 @@ const resourceMonitor = new ResourceMonitor()
 const claudeManager = new ClaudeManager()
 const sshKeyManager = new SSHKeyManager()
 const updateManager = new UpdateManager()
+const auditManager = new AuditManager()
 
 // Load saved API key
 const savedApiKey = credentialManager.getSetting<string | null>('claude_api_key', null)
@@ -74,7 +76,8 @@ function createWindow(): void {
     resourceMonitor,
     claudeManager,
     sshKeyManager,
-    updateManager
+    updateManager,
+    auditManager
   )
 
   // Load the app

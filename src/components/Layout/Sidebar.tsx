@@ -16,6 +16,7 @@ const tabs: { id: ActiveTab; label: string; icon: string; shortcut: string }[] =
   { id: 'chat',       label: 'Claude Chat', icon: '🤖', shortcut: '⌃4' },
   { id: 'claude-cli', label: 'Claude Code', icon: '✨', shortcut: '⌃5' },
   { id: 'monitor',    label: 'Monitor',     icon: '📊', shortcut: '⌃6' },
+  { id: 'audit',      label: 'Audit Log',   icon: '📋', shortcut: '⌃7' },
 ]
 
 export function Sidebar({ activeTab, onTabChange, onAddServer, onOpenSettings }: SidebarProps) {
