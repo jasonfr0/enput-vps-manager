@@ -7,6 +7,7 @@ import { ClaudeManager } from '../managers/ClaudeManager'
 import { SSHKeyManager } from '../managers/SSHKeyManager'
 import { UpdateManager } from '../managers/UpdateManager'
 import { AuditManager, AuditFilter } from '../managers/AuditManager'
+import { UserManager } from '../managers/UserManager'
 import { IPC_CHANNELS, ServerConfig } from '../types'
 import log from 'electron-log'
 
@@ -19,7 +20,8 @@ export function registerIpcHandlers(
   claudeManager: ClaudeManager,
   sshKeyManager: SSHKeyManager,
   updateManager: UpdateManager,
-  auditManager: AuditManager
+  auditManager: AuditManager,
+  userManager: UserManager
 ): void {
   // --- SSH Handlers ---
 
@@ -424,6 +426,38 @@ export function registerIpcHandlers(
 
   ipcMain.handle(IPC_CHANNELS.AUDIT_EXPORT_CSV, async () => {
     return auditManager.exportCsv()
+  })
+
+  // --- User / Team Management Handlers ---
+
+  ipcMain.handle(IPC_CHANNELS.USER_IS_EMPTY, () => {
+    return userManager.isEmpty()
+  })
+
+  ipcMain.handle(IPC_CHANNELS.USER_AUTHENTICATE, async (_, { username, password }) => {
+    const user = await userManager.authenticate(username, password)
+    if (!user) throw new Error('Invalid username or password')
+    return user
+  })
+
+  ipcMain.handle(IPC_CHANNELS.USER_LIST, () => {
+    return userManager.listUsers()
+  })
+
+  ipcMain.handle(IPC_CHANNELS.USER_CREATE, async (_, { username, password, role, serverAccess }) => {
+    return userManager.createUser(username, password, role, serverAccess)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.USER_UPDATE, (_, { id, changes }) => {
+    return userManager.updateUser(id, changes)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.USER_DELETE, (_, { id }) => {
+    userManager.deleteUser(id)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.USER_CHANGE_PASSWORD, async (_, { id, newPassword }) => {
+    await userManager.changePassword(id, newPassword)
   })
 
   log.info('IPC handlers registered')

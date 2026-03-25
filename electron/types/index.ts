@@ -152,4 +152,13 @@ export const IPC_CHANNELS = {
   AUDIT_LOG:       'audit:log',
   AUDIT_CLEAR:     'audit:clear',
   AUDIT_EXPORT_CSV:'audit:exportCsv',
+
+  // User / team management
+  USER_IS_EMPTY:        'user:isEmpty',
+  USER_AUTHENTICATE:    'user:authenticate',
+  USER_LIST:            'user:list',
+  USER_CREATE:          'user:create',
+  USER_UPDATE:          'user:update',
+  USER_DELETE:          'user:delete',
+  USER_CHANGE_PASSWORD: 'user:changePassword',
 } as const

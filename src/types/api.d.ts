@@ -68,6 +68,15 @@ export interface ElectronAPI {
     install: () => void
     onStatus: (callback: (state: any) => void) => () => void
   }
+  users: {
+    isEmpty: () => Promise<boolean>
+    authenticate: (username: string, password: string) => Promise<TeamUser>
+    list: () => Promise<TeamUser[]>
+    create: (username: string, password: string, role: UserRole, serverAccess: string[] | '*') => Promise<TeamUser>
+    update: (id: string, changes: { role?: UserRole; serverAccess?: string[] | '*' }) => Promise<TeamUser>
+    delete: (id: string) => Promise<void>
+    changePassword: (id: string, newPassword: string) => Promise<void>
+  }
   audit: {
     getEntries: (filter?: {
       connId?: string
@@ -80,6 +89,17 @@ export interface ElectronAPI {
     clear: () => Promise<void>
     exportCsv: () => Promise<string>
   }
+}
+
+export type UserRole = 'admin' | 'operator' | 'readonly'
+
+export interface TeamUser {
+  id: string
+  username: string
+  role: UserRole
+  serverAccess: string[] | '*'
+  createdAt: string
+  updatedAt: string
 }
 
 export interface AuditEntry {

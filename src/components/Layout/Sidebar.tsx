@@ -1,6 +1,7 @@
 import React from 'react'
 import { ActiveTab } from '../../App'
 import { useConnectionStore } from '../../context/useConnectionStore'
+import { useSessionStore, ROLE_LABELS } from '../../context/useSessionStore'
 
 interface SidebarProps {
   activeTab: ActiveTab
@@ -21,6 +22,8 @@ const tabs: { id: ActiveTab; label: string; icon: string; shortcut: string }[] =
 
 export function Sidebar({ activeTab, onTabChange, onAddServer, onOpenSettings }: SidebarProps) {
   const { servers, activeServerId, connectionStatus } = useConnectionStore()
+  const { currentUser, logout, isAdmin, canAccessServer } = useSessionStore()
+  const userIsAdmin = isAdmin()
 
   const handleConnect = async (serverId: string) => {
     try {
@@ -64,7 +67,7 @@ export function Sidebar({ activeTab, onTabChange, onAddServer, onOpenSettings }:
       {/* Navigation */}
       <nav style={styles.nav}>
         <div style={styles.sectionLabel}>Navigation</div>
-        {tabs.map((tab) => (
+        {tabs.filter(tab => tab.id !== 'audit' || true).map((tab) => (
           <button
             key={tab.id}
             className={`nav-item${activeTab === tab.id ? ' active' : ''}`}
@@ -76,6 +79,17 @@ export function Sidebar({ activeTab, onTabChange, onAddServer, onOpenSettings }:
             <span className="shortcut-badge">{tab.shortcut}</span>
           </button>
         ))}
+        {/* Team tab — admin only */}
+        {userIsAdmin && (
+          <button
+            className={`nav-item${activeTab === 'team' ? ' active' : ''}`}
+            onClick={() => onTabChange('team')}
+            data-tooltip="Team (admin)"
+          >
+            <span style={styles.navIcon}>👥</span>
+            <span style={styles.navLabel}>Team</span>
+          </button>
+        )}
       </nav>
 
       {/* Servers */}
@@ -160,6 +174,24 @@ export function Sidebar({ activeTab, onTabChange, onAddServer, onOpenSettings }:
           <span className="shortcut-badge">⌃,</span>
         </button>
       </div>
+
+      {/* Current user + logout */}
+      {currentUser && (
+        <div style={styles.userRow}>
+          <div style={styles.userInfo}>
+            <div style={styles.userAvatar}>
+              {currentUser.username.slice(0, 1).toUpperCase()}
+            </div>
+            <div style={styles.userDetails}>
+              <div style={styles.userName}>{currentUser.username}</div>
+              <div style={styles.userRole}>{ROLE_LABELS[currentUser.role]}</div>
+            </div>
+          </div>
+          <button style={styles.logoutBtn} onClick={logout} title="Sign out">
+            ↩
+          </button>
+        </div>
+      )}
 
       {/* Status bar */}
       <div style={styles.statusBar}>
@@ -342,6 +374,62 @@ const styles: Record<string, React.CSSProperties> = {
   settingsRow: {
     padding: '4px 8px 0',
     borderTop: '1px solid var(--border)',
+  },
+  userRow: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: '8px 12px',
+    borderTop: '1px solid var(--border)',
+    gap: '8px',
+  },
+  userInfo: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    minWidth: 0,
+  },
+  userAvatar: {
+    width: '26px',
+    height: '26px',
+    borderRadius: '50%',
+    background: 'var(--accent)',
+    color: '#fff',
+    fontSize: '12px',
+    fontWeight: 700,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  userDetails: {
+    minWidth: 0,
+  },
+  userName: {
+    fontSize: '12px',
+    fontWeight: 500,
+    color: 'var(--text-primary)',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap' as const,
+  },
+  userRole: {
+    fontSize: '10px',
+    color: 'var(--text-muted)',
+  },
+  logoutBtn: {
+    flexShrink: 0,
+    width: '24px',
+    height: '24px',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--radius-sm)',
+    background: 'transparent',
+    color: 'var(--text-muted)',
+    fontSize: '13px',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   statusBar: {
     display: 'flex',

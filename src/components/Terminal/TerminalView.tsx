@@ -5,9 +5,11 @@ import { useSettingsStore } from '../../context/useSettingsStore'
 
 interface TerminalViewProps {
   connId: string
+  /** When true, terminal output is shown but keyboard input is blocked (read-only role) */
+  readOnly?: boolean
 }
 
-export function TerminalView({ connId }: TerminalViewProps) {
+export function TerminalView({ connId, readOnly = false }: TerminalViewProps) {
   const wrapperRef  = useRef<HTMLDivElement>(null)
   const termRef     = useRef<HTMLDivElement>(null)
   const terminalRef = useRef<Terminal | null>(null)
@@ -112,9 +114,14 @@ export function TerminalView({ connId }: TerminalViewProps) {
     }
     initShell()
 
-    terminal.onData((data) => {
-      if (shellIdRef.current) window.api.terminal.write(connId, shellIdRef.current, data)
-    })
+    if (!readOnly) {
+      terminal.onData((data) => {
+        if (shellIdRef.current) window.api.terminal.write(connId, shellIdRef.current, data)
+      })
+    } else {
+      // Show a read-only banner
+      terminal.writeln('\x1b[33m[Read-only mode — input disabled]\x1b[0m\r\n')
+    }
 
     const unsubOutput = window.api.terminal.onOutput(({ shellId, data }) => {
       if (shellId === shellIdRef.current) {
@@ -131,7 +138,7 @@ export function TerminalView({ connId }: TerminalViewProps) {
       if (shellIdRef.current) window.api.terminal.close(connId, shellIdRef.current)
       terminal.dispose()
     }
-  }, [connId, terminalFontSize, terminalScrollback, terminalCursorStyle, terminalCursorBlink])
+  }, [connId, readOnly, terminalFontSize, terminalScrollback, terminalCursorStyle, terminalCursorBlink])
 
   return (
     <div ref={wrapperRef} style={styles.wrapper}>

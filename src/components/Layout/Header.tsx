@@ -15,6 +15,7 @@ const tabMeta: Record<ActiveTab, { label: string; icon: string; shortcut: string
   monitor:    { label: 'Resource Monitor',   icon: '📊', shortcut: 'Ctrl+6' },
   settings:   { label: 'Settings',           icon: '⚙️', shortcut: 'Ctrl+,' },
   audit:      { label: 'Audit Log',          icon: '📋', shortcut: 'Ctrl+7' },
+  team:       { label: 'Team',               icon: '👥', shortcut: '' },
 }
 
 function useUptime(connected: boolean) {

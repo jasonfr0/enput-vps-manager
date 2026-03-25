@@ -9,6 +9,9 @@ import { ClaudeTerminal } from './components/Terminal/ClaudeTerminal'
 import { ResourceMonitor } from './components/Dashboard/ResourceMonitor'
 import { SettingsPanel } from './components/Settings/SettingsPanel'
 import { AuditLog } from './components/Audit/AuditLog'
+import { TeamPanel } from './components/Team/TeamPanel'
+import { LoginScreen } from './components/Auth/LoginScreen'
+import { useSessionStore } from './context/useSessionStore'
 import { AddServerModal } from './components/ServerManager/AddServerModal'
 import { ToastContainer } from './components/UI/ToastContainer'
 import { UpdateBanner } from './components/UI/UpdateBanner'
@@ -17,12 +20,25 @@ import { useSettingsStore } from './context/useSettingsStore'
 import { useUpdateStore } from './context/useUpdateStore'
 import { notify } from './context/useNotificationStore'
 
-export type ActiveTab = 'terminal' | 'files' | 'editor' | 'chat' | 'claude-cli' | 'monitor' | 'settings' | 'audit'
+export type ActiveTab = 'terminal' | 'files' | 'editor' | 'chat' | 'claude-cli' | 'monitor' | 'settings' | 'audit' | 'team'
 
 const TAB_ORDER: ActiveTab[] = ['terminal', 'files', 'editor', 'chat', 'claude-cli', 'monitor', 'audit']
 const LAST_SERVER_KEY = 'enput_last_server'
 
 export default function App() {
+  // Session / auth
+  const { currentUser, bootstrapped, needsSetup, setBootstrapped, canAccessServer } = useSessionStore()
+
+  // Check on mount: does the user store have any accounts yet?
+  useEffect(() => {
+    window.api.users.isEmpty().then((empty: boolean) => {
+      setBootstrapped(empty)
+    }).catch(() => {
+      // If IPC fails (e.g. legacy build), skip gating
+      setBootstrapped(false)
+    })
+  }, [])
+
   // Use the defaultTab setting as the initial tab on every launch
   const [activeTab, setActiveTab] = useState<ActiveTab>(() => {
     const { defaultTab } = useSettingsStore.getState()
@@ -30,7 +46,7 @@ export default function App() {
   })
   const [showAddServer, setShowAddServer] = useState(false)
   const [editorFile, setEditorFile] = useState<{ path: string; content: string } | null>(null)
-  const { activeConnId, connectionStatus } = useConnectionStore()
+  const { activeConnId, connectionStatus, activeServerId, servers } = useConnectionStore()
 
   // Tab change — no longer persists to localStorage (defaultTab setting owns this)
   const handleTabChange = (tab: ActiveTab) => {
@@ -143,9 +159,13 @@ export default function App() {
   }
 
   const renderActiveTab = () => {
-    // Settings and Audit are always available regardless of connection
+    // Always available regardless of connection or role
     if (activeTab === 'settings') return <SettingsPanel />
     if (activeTab === 'audit') return <AuditLog />
+    if (activeTab === 'team') return <TeamPanel />
+
+    // Check server-level access before rendering connected-tabs
+    const serverAccessDenied = activeServerId && !canAccessServer(activeServerId)
 
     if (!activeConnId || connectionStatus !== 'connected') {
       return (
@@ -168,30 +188,82 @@ export default function App() {
       )
     }
 
+    // Access denied for this server
+    if (serverAccessDenied) {
+      return (
+        <div style={styles.emptyState}>
+          <div style={styles.emptyIcon}>🔒</div>
+          <h2 style={styles.emptyTitle}>Access Denied</h2>
+          <p style={styles.emptyText}>You don't have permission to access this server.</p>
+        </div>
+      )
+    }
+
+    const role = currentUser?.role
+    const isOp = role === 'admin' || role === 'operator'
+    const isRO = role === 'readonly'
+
     switch (activeTab) {
       case 'terminal':
-        return <TerminalView connId={activeConnId} />
+        return <TerminalView connId={activeConnId} readOnly={isRO} />
       case 'files':
-        return <FileBrowser connId={activeConnId} onOpenFile={handleOpenFile} />
+        return isOp
+          ? <FileBrowser connId={activeConnId} onOpenFile={handleOpenFile} />
+          : <AccessDeniedMsg feature="File Manager" />
       case 'editor':
-        return (
-          <CodeEditor
-            key={editorFile?.path || 'empty'}
-            connId={activeConnId}
-            filePath={editorFile?.path}
-            initialContent={editorFile?.content}
-            onRequestOpen={() => handleTabChange('files')}
-          />
-        )
+        return isOp
+          ? (
+            <CodeEditor
+              key={editorFile?.path || 'empty'}
+              connId={activeConnId}
+              filePath={editorFile?.path}
+              initialContent={editorFile?.content}
+              onRequestOpen={() => handleTabChange('files')}
+            />
+          )
+          : <AccessDeniedMsg feature="Code Editor" />
       case 'chat':
-        return <ChatInterface connId={activeConnId} />
+        return isOp
+          ? <ChatInterface connId={activeConnId} />
+          : <AccessDeniedMsg feature="Claude Chat" />
       case 'claude-cli':
-        return <ClaudeTerminal connId={activeConnId} />
+        return isOp
+          ? <ClaudeTerminal connId={activeConnId} />
+          : <AccessDeniedMsg feature="Claude Code" />
       case 'monitor':
         return <ResourceMonitor connId={activeConnId} />
       default:
         return null
     }
+  }
+
+  function AccessDeniedMsg({ feature }: { feature: string }) {
+    return (
+      <div style={styles.emptyState}>
+        <div style={styles.emptyIcon}>🔒</div>
+        <h2 style={styles.emptyTitle}>{feature} — Restricted</h2>
+        <p style={styles.emptyText}>Your role (read-only) doesn't have access to this feature.</p>
+      </div>
+    )
+  }
+
+  // First-run setup: no users exist yet
+  if (bootstrapped && needsSetup) {
+    return <LoginScreen setupMode onSetupDone={() => useSessionStore.getState().setBootstrapped(false)} />
+  }
+
+  // Not bootstrapped yet (loading)
+  if (!bootstrapped) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'var(--bg-primary)', color: 'var(--text-muted)' }}>
+        Loading…
+      </div>
+    )
+  }
+
+  // Login gate
+  if (!currentUser) {
+    return <LoginScreen />
   }
 
   return (

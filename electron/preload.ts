@@ -178,6 +178,24 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke('dialog:saveFile', options),
   },
 
+  // User / team management
+  users: {
+    isEmpty: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.USER_IS_EMPTY),
+    authenticate: (username: string, password: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.USER_AUTHENTICATE, { username, password }),
+    list: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.USER_LIST),
+    create: (username: string, password: string, role: string, serverAccess: string[] | '*') =>
+      ipcRenderer.invoke(IPC_CHANNELS.USER_CREATE, { username, password, role, serverAccess }),
+    update: (id: string, changes: { role?: string; serverAccess?: string[] | '*' }) =>
+      ipcRenderer.invoke(IPC_CHANNELS.USER_UPDATE, { id, changes }),
+    delete: (id: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.USER_DELETE, { id }),
+    changePassword: (id: string, newPassword: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.USER_CHANGE_PASSWORD, { id, newPassword }),
+  },
+
   // Audit log
   audit: {
     getEntries: (filter?: any) =>
