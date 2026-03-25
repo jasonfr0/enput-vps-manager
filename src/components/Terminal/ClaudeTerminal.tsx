@@ -1,10 +1,16 @@
-import React, { useLayoutEffect, useRef, useState } from 'react'
+import React, { useLayoutEffect, useRef, useState, useEffect } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { useSettingsStore } from '../../context/useSettingsStore'
 
 interface ClaudeTerminalProps {
   connId: string
+}
+
+interface DirEntry {
+  name: string
+  path: string
+  type: string
 }
 
 export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
@@ -19,6 +25,65 @@ export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
     'checking' | 'not-installed' | 'launching' | 'running' | 'error'
   >('checking')
   const [loadingMsg, setLoadingMsg] = useState('Connecting to VPS…')
+
+  // Working directory — editable before Claude launches, read-only once running.
+  // workingDirRef keeps the closure in useLayoutEffect in sync with the latest value.
+  const [workingDir, setWorkingDir] = useState('~')
+  const workingDirRef = useRef('~')
+  const handleDirChange = (v: string) => { setWorkingDir(v); workingDirRef.current = v }
+
+  // ── Directory picker state ────────────────────────────────────────────────
+  const [pickerOpen,    setPickerOpen]    = useState(false)
+  const [pickerPath,    setPickerPath]    = useState('/')
+  const [pickerEntries, setPickerEntries] = useState<DirEntry[]>([])
+  const [pickerLoading, setPickerLoading] = useState(false)
+  const [pickerError,   setPickerError]   = useState('')
+
+  const openPicker = async () => {
+    // Start at the current workingDir, resolving '~' to '/'
+    const startPath = workingDirRef.current === '~' ? '/' : workingDirRef.current
+    setPickerOpen(true)
+    await loadPickerDir(startPath)
+  }
+
+  const loadPickerDir = async (path: string) => {
+    setPickerLoading(true)
+    setPickerError('')
+    setPickerPath(path)
+    try {
+      const entries: DirEntry[] = await window.api.sftp.listDir(connId, path)
+      setPickerEntries(
+        entries
+          .filter(e => e.type === 'directory' && e.name !== '.')
+          .sort((a, b) => a.name.localeCompare(b.name))
+      )
+    } catch (err: any) {
+      setPickerError(err.message || 'Failed to list directory')
+    } finally {
+      setPickerLoading(false)
+    }
+  }
+
+  const pickerNavigate = (path: string) => loadPickerDir(path)
+
+  const pickerUp = () => {
+    if (pickerPath === '/') return
+    const parent = pickerPath.split('/').slice(0, -1).join('/') || '/'
+    loadPickerDir(parent)
+  }
+
+  const pickerSelect = () => {
+    handleDirChange(pickerPath)
+    setPickerOpen(false)
+  }
+
+  // Breadcrumb segments for the picker header
+  const pickerSegments = pickerPath === '/'
+    ? [{ label: '/', path: '/' }]
+    : [{ label: '/', path: '/' }, ...pickerPath.split('/').filter(Boolean).map((seg, i, arr) => ({
+        label: seg,
+        path: '/' + arr.slice(0, i + 1).join('/'),
+      }))]
 
   // useLayoutEffect fires synchronously after the DOM is mutated but BEFORE
   // the browser paints. We defer the first syncSize() to a requestAnimationFrame
@@ -62,11 +127,6 @@ export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
     fitAddonRef.current = fitAddon
 
     // ── Scroll helper ─────────────────────────────────────────────────────
-    // Setting .xterm-viewport scrollTop directly is more reliable than
-    // terminal.scrollToBottom(). It triggers xterm's native scroll event
-    // listener which updates the internal ydisp state, so xterm keeps
-    // auto-scrolling on subsequent writes without us fighting its render
-    // cycle. We also call the API as a belt-and-suspenders measure.
     const scrollToBottom = () => {
       const vp = termEl.querySelector('.xterm-viewport') as HTMLElement | null
       if (vp) vp.scrollTop = vp.scrollHeight
@@ -107,9 +167,6 @@ export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
 
     const unsubOutput = window.api.terminal.onOutput(({ shellId, data }: { shellId: string; data: string }) => {
       if (shellId !== shellIdRef.current) return
-      // Write callback fires after xterm has parsed + buffered the data,
-      // so scrollToBottom lands at the actual new bottom. The extra rAF
-      // covers xterm's canvas redraw which happens in the next frame.
       terminal.write(data, () => requestAnimationFrame(scrollToBottom))
       if (!hasChecked) {
         outputBuffer += data
@@ -117,7 +174,9 @@ export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
           hasChecked = true
           setClaudeStatus('launching')
           setTimeout(() => {
-            window.api.terminal.write(connId, shellIdRef.current!, 'claude\n')
+            // cd into the chosen directory then launch claude
+            const dir = workingDirRef.current || '~'
+            window.api.terminal.write(connId, shellIdRef.current!, `cd ${dir} && claude\n`)
             setClaudeStatus('running')
           }, 300)
         } else if (outputBuffer.includes('CLAUDE_NOT_FOUND')) {
@@ -145,8 +204,6 @@ export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
         await new Promise<void>((resolve) => setTimeout(resolve, 700))
         terminal.reset()
 
-        // reset() wipes xterm's internal state — re-fit synchronously
-        // then scroll to the new bottom in the next frame.
         fitAddon.fit()
         await new Promise<void>((resolve) => requestAnimationFrame(() => { scrollToBottom(); resolve() }))
 
@@ -182,12 +239,16 @@ export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
 
   const handleLaunchClaude = () => {
     if (!shellIdRef.current) return
-    window.api.terminal.write(connId, shellIdRef.current, 'claude\n')
+    const dir = workingDirRef.current || '~'
+    window.api.terminal.write(connId, shellIdRef.current, `cd ${dir} && claude\n`)
     setClaudeStatus('running')
   }
 
+  const isRunning = claudeStatus === 'running'
+
   return (
     <div style={styles.root}>
+      {/* ── Top bar ── */}
       <div style={styles.topBar}>
         <div style={styles.topBarLeft}>
           <span style={{ fontSize: '14px' }}>✨</span>
@@ -220,12 +281,102 @@ export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
         </div>
       </div>
 
+      {/* ── Directory bar ── */}
+      <div style={styles.dirBar}>
+        <span style={styles.dirLabel}>
+          {isRunning ? 'Launched in:' : 'Working directory:'}
+        </span>
+        <input
+          style={{ ...styles.dirInput, ...(isRunning ? styles.dirInputReadonly : {}) }}
+          value={workingDir}
+          readOnly={isRunning}
+          onChange={e => handleDirChange(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }}
+          placeholder="~ (home directory)"
+          spellCheck={false}
+        />
+        {!isRunning && (
+          <button style={styles.browseBtn} onClick={openPicker} title="Browse directories">
+            📂
+          </button>
+        )}
+      </div>
+
+      {/* ── Terminal + picker overlay ── */}
       <div ref={wrapperRef} style={styles.termWrapper}>
         <div ref={termRef} style={styles.term} />
+
         {!isReady && (
           <div style={styles.loading}>
             <div style={styles.loadingDot} />
             <span>{loadingMsg}</span>
+          </div>
+        )}
+
+        {/* Directory picker panel */}
+        {pickerOpen && (
+          <div style={styles.picker}>
+            {/* Picker header / breadcrumb */}
+            <div style={styles.pickerHeader}>
+              <div style={styles.pickerBreadcrumb}>
+                {pickerSegments.map((seg, i) => (
+                  <React.Fragment key={seg.path}>
+                    {i > 0 && <span style={styles.pickerSep}>/</span>}
+                    <button
+                      style={{
+                        ...styles.pickerCrumb,
+                        ...(i === pickerSegments.length - 1 ? styles.pickerCrumbActive : {}),
+                      }}
+                      onClick={() => pickerNavigate(seg.path)}
+                    >
+                      {seg.label}
+                    </button>
+                  </React.Fragment>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <button style={styles.pickerUpBtn} onClick={pickerUp} disabled={pickerPath === '/'} title="Go up">
+                  ↑ Up
+                </button>
+                <button style={{ ...styles.actionBtn, background: 'var(--accent)' }} onClick={pickerSelect}>
+                  Select
+                </button>
+                <button style={{ ...styles.actionBtn, background: 'var(--bg-tertiary)' }} onClick={() => setPickerOpen(false)}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+
+            {/* Picker body */}
+            <div style={styles.pickerBody}>
+              {pickerLoading && (
+                <div style={styles.pickerStatus}>Loading…</div>
+              )}
+              {!pickerLoading && pickerError && (
+                <div style={{ ...styles.pickerStatus, color: 'var(--error)' }}>{pickerError}</div>
+              )}
+              {!pickerLoading && !pickerError && pickerEntries.length === 0 && (
+                <div style={styles.pickerStatus}>No subdirectories</div>
+              )}
+              {!pickerLoading && pickerEntries.map(entry => (
+                <button
+                  key={entry.path}
+                  style={styles.pickerEntry}
+                  onClick={() => pickerNavigate(entry.path)}
+                  onDoubleClick={pickerSelect}
+                  title={`Double-click to select ${entry.path}`}
+                >
+                  <span style={{ marginRight: 6 }}>📁</span>
+                  {entry.name}
+                </button>
+              ))}
+            </div>
+
+            <div style={styles.pickerFooter}>
+              <span style={{ color: 'var(--text-muted)', fontSize: '11px' }}>
+                Double-click a folder to select it, or navigate then click Select
+              </span>
+            </div>
           </div>
         )}
       </div>
@@ -267,6 +418,51 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 500,
     cursor: 'pointer',
   },
+
+  // ── Directory bar ──────────────────────────────────────────────────────────
+  dirBar: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '5px 12px',
+    borderBottom: '1px solid var(--border)',
+    background: 'var(--bg-primary)',
+    flexShrink: 0,
+  },
+  dirLabel: {
+    fontSize: '11px',
+    color: 'var(--text-muted)',
+    whiteSpace: 'nowrap',
+    flexShrink: 0,
+  },
+  dirInput: {
+    flex: 1,
+    background: 'var(--bg-tertiary)',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--radius-sm)',
+    color: 'var(--text-primary)',
+    fontSize: '12px',
+    padding: '3px 8px',
+    fontFamily: "'Cascadia Code', 'Fira Code', monospace",
+    outline: 'none',
+    minWidth: 0,
+  },
+  dirInputReadonly: {
+    opacity: 0.6,
+    cursor: 'default',
+  },
+  browseBtn: {
+    background: 'var(--bg-tertiary)',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--radius-sm)',
+    cursor: 'pointer',
+    fontSize: '14px',
+    padding: '2px 6px',
+    lineHeight: 1,
+    flexShrink: 0,
+  },
+
+  // ── Terminal wrapper ───────────────────────────────────────────────────────
   termWrapper: {
     flex: 1,
     minHeight: 0,
@@ -297,5 +493,94 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: '50%',
     background: 'var(--accent)',
     animation: 'pulse 1.4s ease-in-out infinite',
+  },
+
+  // ── Directory picker ───────────────────────────────────────────────────────
+  picker: {
+    position: 'absolute',
+    inset: 0,
+    background: 'var(--bg-secondary)',
+    display: 'flex',
+    flexDirection: 'column',
+    zIndex: 10,
+    border: '1px solid var(--border)',
+  },
+  pickerHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: '8px 12px',
+    borderBottom: '1px solid var(--border)',
+    background: 'var(--bg-tertiary)',
+    gap: '12px',
+    flexShrink: 0,
+  },
+  pickerBreadcrumb: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '2px',
+    flex: 1,
+    overflow: 'hidden',
+    flexWrap: 'wrap',
+  },
+  pickerCrumb: {
+    background: 'none',
+    border: 'none',
+    color: 'var(--accent)',
+    fontSize: '12px',
+    cursor: 'pointer',
+    padding: '2px 4px',
+    borderRadius: '3px',
+    fontFamily: "'Cascadia Code', monospace",
+  },
+  pickerCrumbActive: {
+    color: 'var(--text-primary)',
+    cursor: 'default',
+    fontWeight: 600,
+  },
+  pickerSep: {
+    color: 'var(--text-muted)',
+    fontSize: '12px',
+    userSelect: 'none',
+  },
+  pickerUpBtn: {
+    background: 'var(--bg-secondary)',
+    border: '1px solid var(--border)',
+    color: 'var(--text-secondary)',
+    fontSize: '11px',
+    padding: '3px 8px',
+    borderRadius: 'var(--radius-sm)',
+    cursor: 'pointer',
+  },
+  pickerBody: {
+    flex: 1,
+    overflowY: 'auto',
+    padding: '4px',
+  },
+  pickerStatus: {
+    color: 'var(--text-muted)',
+    fontSize: '12px',
+    padding: '16px',
+    textAlign: 'center',
+  },
+  pickerEntry: {
+    display: 'flex',
+    alignItems: 'center',
+    width: '100%',
+    background: 'none',
+    border: 'none',
+    color: 'var(--text-primary)',
+    fontSize: '13px',
+    padding: '6px 10px',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    textAlign: 'left',
+    fontFamily: 'inherit',
+  },
+  pickerFooter: {
+    padding: '6px 12px',
+    borderTop: '1px solid var(--border)',
+    background: 'var(--bg-tertiary)',
+    flexShrink: 0,
   },
 }
