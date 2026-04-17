@@ -97,9 +97,9 @@ export interface ElectronAPI {
     /** Ping the server to verify connectivity */
     test: () => Promise<{ ok: boolean; latencyMs: number }>
     /** Authenticate and receive tokens; tokens stored in OS safe-storage */
-    login: (username: string, password: string) => Promise<{ user: RemoteUser }>
+    login: (username: string, password: string) => Promise<RemoteUser>
     /** Exchange the stored refresh token for a new pair; returns null if no session */
-    refresh: () => Promise<{ user: RemoteUser } | null>
+    refresh: () => Promise<RemoteUser | null>
     /** Revoke the current refresh token and clear the local session */
     logout: () => Promise<void>
     // ── User management (admin only) ───────────────────────────────────────

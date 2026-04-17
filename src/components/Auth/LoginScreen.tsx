@@ -60,11 +60,11 @@ export function LoginScreen({ setupMode = false, onSetupDone }: LoginScreenProps
           // Attempt silent token refresh for auto-login
           setSilentCheck(true)
           try {
-            const result = await window.api.authServer.refresh()
+            const user = await window.api.authServer.refresh()
             if (cancelled) return
-            if (result?.user) {
+            if (user) {
               setRemote(true)
-              setCurrentUser(result.user as any)
+              setCurrentUser(user as any)
               return
             }
           } catch {
@@ -132,9 +132,9 @@ export function LoginScreen({ setupMode = false, onSetupDone }: LoginScreenProps
     setBusy(true)
     setError('')
     try {
-      const result = await window.api.authServer.login(username.trim(), password)
+      const user = await window.api.authServer.login(username.trim(), password)
       setRemote(true)
-      setCurrentUser(result.user as any)
+      setCurrentUser(user as any)
     } catch (err: any) {
       setError(err?.message ?? 'Login failed')
     } finally {
