@@ -190,84 +190,15 @@ export default function App() {
     handleTabChange('editor')
   }
 
-  const renderActiveTab = () => {
-    // Always available regardless of connection or role
-    if (activeTab === 'settings') return <SettingsPanel />
-    if (activeTab === 'audit') return <AuditLog />
-    if (activeTab === 'team') return <TeamPanel />
+  // Role helpers used in the persistent tab layout below
+  const role = currentUser?.role
+  const isOp = role === 'admin' || role === 'operator'
+  const isRO = role === 'readonly'
+  const isConnected = activeConnId && connectionStatus === 'connected'
+  const serverAccessDenied = !!(activeServerId && !canAccessServer(activeServerId))
 
-    // Check server-level access before rendering connected-tabs
-    const serverAccessDenied = activeServerId && !canAccessServer(activeServerId)
-
-    if (!activeConnId || connectionStatus !== 'connected') {
-      return (
-        <div style={styles.emptyState}>
-          <div style={styles.emptyIcon}>&#9889;</div>
-          <h2 style={styles.emptyTitle}>No Active Connection</h2>
-          {connectionStatus === 'connecting' ? (
-            <p style={styles.emptyText}>Connecting to server…</p>
-          ) : (
-            <p style={styles.emptyText}>
-              Select a server from the sidebar or add a new one to get started.
-            </p>
-          )}
-          {connectionStatus !== 'connecting' && (
-            <button style={styles.addButton} onClick={() => setShowAddServer(true)}>
-              + Add Server
-            </button>
-          )}
-        </div>
-      )
-    }
-
-    // Access denied for this server
-    if (serverAccessDenied) {
-      return (
-        <div style={styles.emptyState}>
-          <div style={styles.emptyIcon}>🔒</div>
-          <h2 style={styles.emptyTitle}>Access Denied</h2>
-          <p style={styles.emptyText}>You don't have permission to access this server.</p>
-        </div>
-      )
-    }
-
-    const role = currentUser?.role
-    const isOp = role === 'admin' || role === 'operator'
-    const isRO = role === 'readonly'
-
-    switch (activeTab) {
-      case 'terminal':
-        return <TerminalView connId={activeConnId} readOnly={isRO} />
-      case 'files':
-        return isOp
-          ? <FileBrowser connId={activeConnId} onOpenFile={handleOpenFile} />
-          : <AccessDeniedMsg feature="File Manager" />
-      case 'editor':
-        return isOp
-          ? (
-            <CodeEditor
-              key={editorFile?.path || 'empty'}
-              connId={activeConnId}
-              filePath={editorFile?.path}
-              initialContent={editorFile?.content}
-              onRequestOpen={() => handleTabChange('files')}
-            />
-          )
-          : <AccessDeniedMsg feature="Code Editor" />
-      case 'chat':
-        return isOp
-          ? <ChatInterface connId={activeConnId} />
-          : <AccessDeniedMsg feature="Claude Chat" />
-      case 'claude-cli':
-        return isOp
-          ? <ClaudeTerminal connId={activeConnId} />
-          : <AccessDeniedMsg feature="Claude Code" />
-      case 'monitor':
-        return <ResourceMonitor connId={activeConnId} />
-      default:
-        return null
-    }
-  }
+  // Whether the active tab is one of the overlay tabs (no connection needed)
+  const isOverlayTab = activeTab === 'settings' || activeTab === 'audit' || activeTab === 'team'
 
   function AccessDeniedMsg({ feature }: { feature: string }) {
     return (
@@ -278,6 +209,15 @@ export default function App() {
       </div>
     )
   }
+
+  // Inline style helper: show a tab pane when active, hide otherwise
+  const pane = (tab: ActiveTab): React.CSSProperties => ({
+    display: activeTab === tab ? 'flex' : 'none',
+    flex: 1,
+    overflow: 'hidden',
+    flexDirection: 'column',
+    position: 'relative',
+  })
 
   // First-run setup: no users exist yet
   if (bootstrapped && needsSetup) {
@@ -310,9 +250,90 @@ export default function App() {
         <Header activeTab={activeTab} />
         <UpdateBanner />
         <div style={styles.content}>
-          <div key={activeTab} className="tab-content">
-            {renderActiveTab()}
+
+          {/* ── Overlay tabs (settings / audit / team) — conditionally rendered ── */}
+          {activeTab === 'settings' && <SettingsPanel />}
+          {activeTab === 'audit'    && <AuditLog />}
+          {activeTab === 'team'     && <TeamPanel />}
+
+          {/* ── Connection area — hidden behind overlay tabs but never unmounted ── */}
+          {/* Using display:none instead of conditional rendering keeps terminal PTY  */}
+          {/* sessions, Claude Code sessions, and chat history alive across tab switches */}
+          <div style={{ display: isOverlayTab ? 'none' : 'flex', flex: 1, overflow: 'hidden', flexDirection: 'column' }}>
+
+            {/* No connection placeholder */}
+            {!isConnected && (
+              <div style={styles.emptyState}>
+                <div style={styles.emptyIcon}>&#9889;</div>
+                <h2 style={styles.emptyTitle}>No Active Connection</h2>
+                {connectionStatus === 'connecting' ? (
+                  <p style={styles.emptyText}>Connecting to server…</p>
+                ) : (
+                  <p style={styles.emptyText}>Select a server from the sidebar or add a new one to get started.</p>
+                )}
+                {connectionStatus !== 'connecting' && (
+                  <button style={styles.addButton} onClick={() => setShowAddServer(true)}>+ Add Server</button>
+                )}
+              </div>
+            )}
+
+            {/* Server access denied */}
+            {isConnected && serverAccessDenied && (
+              <div style={styles.emptyState}>
+                <div style={styles.emptyIcon}>🔒</div>
+                <h2 style={styles.emptyTitle}>Access Denied</h2>
+                <p style={styles.emptyText}>You don't have permission to access this server.</p>
+              </div>
+            )}
+
+            {/* ── Persistent session tabs — always mounted while connected ── */}
+            {isConnected && !serverAccessDenied && (
+              <>
+                {/* Terminal — PTY session must survive tab switches */}
+                <div style={pane('terminal')}>
+                  <TerminalView connId={activeConnId!} readOnly={isRO} isActive={activeTab === 'terminal'} />
+                </div>
+
+                {/* Claude Code — PTY session must survive tab switches */}
+                <div style={pane('claude-cli')}>
+                  {isOp
+                    ? <ClaudeTerminal connId={activeConnId!} isActive={activeTab === 'claude-cli'} />
+                    : <AccessDeniedMsg feature="Claude Code" />}
+                </div>
+
+                {/* Claude Chat — conversation history lives in component state */}
+                <div style={pane('chat')}>
+                  {isOp
+                    ? <ChatInterface connId={activeConnId!} />
+                    : <AccessDeniedMsg feature="Claude Chat" />}
+                </div>
+
+                {/* Editor — unsaved edits must survive tab switches */}
+                <div style={pane('editor')}>
+                  {isOp
+                    ? <CodeEditor
+                        key={editorFile?.path || 'empty'}
+                        connId={activeConnId!}
+                        filePath={editorFile?.path}
+                        initialContent={editorFile?.content}
+                        onRequestOpen={() => handleTabChange('files')}
+                      />
+                    : <AccessDeniedMsg feature="Code Editor" />}
+                </div>
+
+                {/* Files — cheap to re-fetch, conditionally rendered */}
+                {activeTab === 'files' && (
+                  isOp
+                    ? <FileBrowser connId={activeConnId!} onOpenFile={handleOpenFile} />
+                    : <AccessDeniedMsg feature="File Manager" />
+                )}
+
+                {/* Monitor — just polls metrics, conditionally rendered */}
+                {activeTab === 'monitor' && <ResourceMonitor connId={activeConnId!} />}
+              </>
+            )}
           </div>
+
         </div>
       </div>
       {showAddServer && (

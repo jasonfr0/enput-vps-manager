@@ -7,9 +7,11 @@ interface TerminalViewProps {
   connId: string
   /** When true, terminal output is shown but keyboard input is blocked (read-only role) */
   readOnly?: boolean
+  /** When true, this tab is currently visible — triggers a refit after being hidden */
+  isActive?: boolean
 }
 
-export function TerminalView({ connId, readOnly = false }: TerminalViewProps) {
+export function TerminalView({ connId, readOnly = false, isActive = true }: TerminalViewProps) {
   const wrapperRef  = useRef<HTMLDivElement>(null)
   const termRef     = useRef<HTMLDivElement>(null)
   const terminalRef = useRef<Terminal | null>(null)
@@ -139,6 +141,25 @@ export function TerminalView({ connId, readOnly = false }: TerminalViewProps) {
       terminal.dispose()
     }
   }, [connId, readOnly, terminalFontSize, terminalScrollback, terminalCursorStyle, terminalCursorBlink])
+
+  // When this tab is revealed after being hidden (display:none → flex), the
+  // ResizeObserver may not fire reliably. Force a refit on the next frame.
+  useLayoutEffect(() => {
+    if (!isActive) return
+    const wrapper = wrapperRef.current
+    const fitAddon = fitAddonRef.current
+    if (!wrapper || !fitAddon) return
+    requestAnimationFrame(() => {
+      const rect = wrapper.getBoundingClientRect()
+      if (rect.width <= 0) return
+      const termEl = termRef.current
+      if (termEl) termEl.style.height = `${Math.max(1, Math.floor(window.innerHeight - rect.top))}px`
+      fitAddon.fit()
+      if (shellIdRef.current && terminalRef.current) {
+        window.api.terminal.resize(connId, shellIdRef.current, terminalRef.current.cols, terminalRef.current.rows)
+      }
+    })
+  }, [isActive, connId])
 
   return (
     <div ref={wrapperRef} style={styles.wrapper}>

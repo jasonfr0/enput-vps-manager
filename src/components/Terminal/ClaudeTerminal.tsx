@@ -5,6 +5,8 @@ import { useSettingsStore } from '../../context/useSettingsStore'
 
 interface ClaudeTerminalProps {
   connId: string
+  /** When true, this tab is currently visible — triggers a refit after being hidden */
+  isActive?: boolean
 }
 
 interface DirEntry {
@@ -13,7 +15,7 @@ interface DirEntry {
   type: string
 }
 
-export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
+export function ClaudeTerminal({ connId, isActive = true }: ClaudeTerminalProps) {
   const wrapperRef  = useRef<HTMLDivElement>(null)
   const termRef     = useRef<HTMLDivElement>(null)
   const terminalRef = useRef<Terminal | null>(null)
@@ -227,6 +229,24 @@ export function ClaudeTerminal({ connId }: ClaudeTerminalProps) {
       terminal.dispose()
     }
   }, [connId, terminalFontSize, terminalScrollback, terminalCursorStyle, terminalCursorBlink])
+
+  // Refit when revealed after being hidden via display:none
+  useLayoutEffect(() => {
+    if (!isActive) return
+    const wrapper = wrapperRef.current
+    const fitAddon = fitAddonRef.current
+    if (!wrapper || !fitAddon) return
+    requestAnimationFrame(() => {
+      const rect = wrapper.getBoundingClientRect()
+      if (rect.width <= 0) return
+      const termEl = termRef.current
+      if (termEl) termEl.style.height = `${Math.max(1, Math.floor(window.innerHeight - rect.top))}px`
+      fitAddon.fit()
+      if (shellIdRef.current && terminalRef.current) {
+        window.api.terminal.resize(connId, shellIdRef.current, terminalRef.current.cols, terminalRef.current.rows)
+      }
+    })
+  }, [isActive, connId])
 
   const handleInstallClaude = () => {
     if (!shellIdRef.current) return
