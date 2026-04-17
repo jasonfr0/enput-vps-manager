@@ -27,7 +27,7 @@ const LAST_SERVER_KEY = 'enput_last_server'
 
 export default function App() {
   // Session / auth
-  const { currentUser, bootstrapped, needsSetup, setBootstrapped, canAccessServer } = useSessionStore()
+  const { currentUser, bootstrapped, needsSetup, isRemote, setBootstrapped, canAccessServer } = useSessionStore()
 
   // Check on mount: remote auth server takes priority over local user store.
   // If a server URL is already saved, skip the local isEmpty check entirely —
@@ -94,6 +94,24 @@ export default function App() {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
+
+  // When logged in via remote auth server, merge shared servers from the registry
+  // into the connection store so users don't have to re-add them manually.
+  // Remote servers supplement local ones — duplicates (same host+port) are skipped.
+  useEffect(() => {
+    if (!currentUser || !isRemote) return
+    window.api.authServer.listServers().then((remoteServers: any[]) => {
+      if (!remoteServers?.length) return
+      const store = useConnectionStore.getState()
+      const existing = store.servers
+      const toAdd = remoteServers.filter(
+        (r) => !existing.some((l: any) => l.host === r.host && l.port === r.port)
+      )
+      if (toAdd.length > 0) {
+        store.setServers([...existing, ...toAdd])
+      }
+    }).catch(() => {/* auth server unreachable — silently ignore */})
+  }, [currentUser, isRemote])
 
   // Load saved servers on mount, then auto-connect if the setting is on
   useEffect(() => {
