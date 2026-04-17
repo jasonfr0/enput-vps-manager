@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { FormEvent, useState } from 'react'
 import { ActiveTab } from '../../App'
 import { useConnectionStore } from '../../context/useConnectionStore'
 import { useSessionStore, ROLE_LABELS } from '../../context/useSessionStore'
@@ -20,17 +20,187 @@ const tabs: { id: ActiveTab; label: string; icon: string; shortcut: string }[] =
   { id: 'audit',      label: 'Audit Log',   icon: '📋', shortcut: '⌃7' },
 ]
 
+// ── Credential prompt modal ───────────────────────────────────────────────────
+// Shown when a server synced from the remote registry has no local credentials yet.
+
+interface CredPrompt {
+  serverId:  string
+  name:      string
+  host:      string
+  port:      number
+  username:  string
+  authType:  'password' | 'key'
+}
+
+function CredentialModal({
+  prompt,
+  onCancel,
+  onSaved,
+}: {
+  prompt: CredPrompt
+  onCancel: () => void
+  onSaved: (localServerId: string) => void
+}) {
+  const [authType, setAuthType]       = useState<'password' | 'key'>(prompt.authType)
+  const [password, setPassword]       = useState('')
+  const [keyPath, setKeyPath]         = useState('')
+  const [passphrase, setPassphrase]   = useState('')
+  const [busy, setBusy]               = useState(false)
+  const [error, setError]             = useState('')
+
+  const pickKeyFile = async () => {
+    const result = await window.api.dialog.openFile({
+      title: 'Select SSH private key',
+      filters: [{ name: 'All files', extensions: ['*'] }],
+    })
+    if (result?.filePaths?.[0]) setKeyPath(result.filePaths[0])
+  }
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault()
+    setError('')
+    if (authType === 'password' && !password) { setError('Password is required'); return }
+    if (authType === 'key'      && !keyPath)  { setError('Select a private key file'); return }
+    setBusy(true)
+    try {
+      // Save server locally with credentials — this creates a new entry with a local ID
+      const saved = await window.api.servers.add({
+        name:           prompt.name,
+        host:           prompt.host,
+        port:           prompt.port,
+        username:       prompt.username,
+        authType,
+        password:       authType === 'password' ? password : undefined,
+        privateKeyPath: authType === 'key'      ? keyPath  : undefined,
+        passphrase:     authType === 'key' && passphrase   ? passphrase : undefined,
+      })
+      // Swap the remote-only entry for the locally-saved one in the store
+      const store = useConnectionStore.getState()
+      store.removeServer(prompt.serverId)
+      store.addServer(saved)
+      onSaved(saved.id)
+    } catch (err: any) {
+      setError(err?.message ?? 'Failed to save credentials')
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div style={credStyles.overlay}>
+      <div style={credStyles.modal}>
+        <div style={credStyles.header}>
+          <span style={credStyles.title}>Enter SSH credentials</span>
+          <button style={credStyles.closeBtn} onClick={onCancel}>×</button>
+        </div>
+        <div style={credStyles.serverInfo}>
+          <span style={credStyles.serverName}>{prompt.name}</span>
+          <span style={credStyles.serverAddr}>{prompt.username}@{prompt.host}:{prompt.port}</span>
+        </div>
+        <form onSubmit={handleSubmit}>
+          {/* Auth type toggle */}
+          <div style={credStyles.toggleRow}>
+            <button
+              type="button"
+              style={{ ...credStyles.toggleBtn, ...(authType === 'password' ? credStyles.toggleActive : {}) }}
+              onClick={() => setAuthType('password')}
+            >Password</button>
+            <button
+              type="button"
+              style={{ ...credStyles.toggleBtn, ...(authType === 'key' ? credStyles.toggleActive : {}) }}
+              onClick={() => setAuthType('key')}
+            >SSH Key</button>
+          </div>
+
+          {authType === 'password' ? (
+            <div style={credStyles.field}>
+              <label style={credStyles.label}>Password</label>
+              <input
+                style={credStyles.input}
+                type="password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                autoFocus
+                autoComplete="current-password"
+                disabled={busy}
+              />
+            </div>
+          ) : (
+            <>
+              <div style={credStyles.field}>
+                <label style={credStyles.label}>Private key file</label>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <input
+                    style={{ ...credStyles.input, flex: 1 }}
+                    value={keyPath}
+                    onChange={e => setKeyPath(e.target.value)}
+                    placeholder="Path to private key…"
+                    disabled={busy}
+                  />
+                  <button type="button" style={credStyles.browseBtn} onClick={pickKeyFile} disabled={busy}>
+                    Browse
+                  </button>
+                </div>
+              </div>
+              <div style={credStyles.field}>
+                <label style={credStyles.label}>Passphrase <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(if any)</span></label>
+                <input
+                  style={credStyles.input}
+                  type="password"
+                  value={passphrase}
+                  onChange={e => setPassphrase(e.target.value)}
+                  autoComplete="off"
+                  disabled={busy}
+                />
+              </div>
+            </>
+          )}
+
+          {error && <div style={credStyles.error}>{error}</div>}
+
+          <div style={{ display: 'flex', gap: '8px', marginTop: '14px' }}>
+            <button style={credStyles.connectBtn} type="submit" disabled={busy}>
+              {busy ? 'Saving…' : 'Save & Connect'}
+            </button>
+            <button style={credStyles.cancelBtn} type="button" onClick={onCancel} disabled={busy}>
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 export function Sidebar({ activeTab, onTabChange, onAddServer, onOpenSettings }: SidebarProps) {
   const { servers, activeServerId, connectionStatus } = useConnectionStore()
   const { currentUser, logout, isAdmin, canAccessServer } = useSessionStore()
   const userIsAdmin = isAdmin()
+
+  // Credential prompt state — set when a remote-registry server has no local creds
+  const [credPrompt, setCredPrompt] = useState<CredPrompt | null>(null)
 
   const handleConnect = async (serverId: string) => {
     try {
       useConnectionStore.getState().setConnectionStatus('connecting')
       await window.api.ssh.connect(serverId)
     } catch (err: any) {
-      useConnectionStore.getState().setError(err.message)
+      if (err.message?.includes('Server not found')) {
+        // Server came from remote registry — prompt for credentials
+        useConnectionStore.getState().setConnectionStatus('disconnected')
+        const server = useConnectionStore.getState().servers.find(s => s.id === serverId)
+        if (server) {
+          setCredPrompt({
+            serverId: server.id,
+            name:     server.name,
+            host:     server.host,
+            port:     server.port,
+            username: server.username,
+            authType: (server as any).authType ?? 'password',
+          })
+        }
+      } else {
+        useConnectionStore.getState().setError(err.message)
+      }
     }
   }
 
@@ -58,6 +228,16 @@ export function Sidebar({ activeTab, onTabChange, onAddServer, onOpenSettings }:
 
   return (
     <div style={styles.sidebar}>
+      {credPrompt && (
+        <CredentialModal
+          prompt={credPrompt}
+          onCancel={() => setCredPrompt(null)}
+          onSaved={(localId) => {
+            setCredPrompt(null)
+            handleConnect(localId)
+          }}
+        />
+      )}
       {/* Logo */}
       <div style={styles.logo}>
         <span style={styles.logoIcon}>⚡</span>
@@ -449,5 +629,146 @@ const styles: Record<string, React.CSSProperties> = {
   statusText: {
     color: 'var(--text-secondary)',
     fontSize: '12px',
+  },
+}
+
+const credStyles: Record<string, React.CSSProperties> = {
+  overlay: {
+    position: 'fixed',
+    inset: 0,
+    background: 'rgba(0,0,0,0.6)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 9999,
+  },
+  modal: {
+    width: '360px',
+    background: 'var(--bg-secondary)',
+    border: '1px solid var(--border)',
+    borderRadius: '12px',
+    padding: '20px 24px 24px',
+    boxShadow: '0 16px 48px rgba(0,0,0,0.5)',
+  },
+  header: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: '12px',
+  },
+  title: {
+    fontSize: '14px',
+    fontWeight: 600,
+    color: 'var(--text-primary)',
+  },
+  closeBtn: {
+    background: 'none',
+    border: 'none',
+    color: 'var(--text-muted)',
+    fontSize: '18px',
+    cursor: 'pointer',
+    lineHeight: 1,
+    padding: '0 2px',
+  },
+  serverInfo: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '2px',
+    padding: '8px 10px',
+    background: 'var(--bg-tertiary)',
+    borderRadius: 'var(--radius-sm)',
+    border: '1px solid var(--border)',
+    marginBottom: '14px',
+  },
+  serverName: {
+    fontSize: '13px',
+    fontWeight: 500,
+    color: 'var(--text-primary)',
+  },
+  serverAddr: {
+    fontSize: '11px',
+    color: 'var(--text-muted)',
+    fontFamily: 'var(--font-mono)',
+  },
+  toggleRow: {
+    display: 'flex',
+    gap: '6px',
+    marginBottom: '12px',
+  },
+  toggleBtn: {
+    flex: 1,
+    padding: '6px 0',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--radius-sm)',
+    background: 'transparent',
+    color: 'var(--text-muted)',
+    fontSize: '12px',
+    fontWeight: 500,
+    cursor: 'pointer',
+  },
+  toggleActive: {
+    background: 'rgba(99,102,241,0.15)',
+    borderColor: 'var(--accent)',
+    color: 'var(--accent)',
+  },
+  field: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '5px',
+    marginBottom: '10px',
+  },
+  label: {
+    fontSize: '11px',
+    fontWeight: 500,
+    color: 'var(--text-secondary)',
+  },
+  input: {
+    padding: '8px 10px',
+    background: 'var(--bg-tertiary)',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--radius-sm)',
+    color: 'var(--text-primary)',
+    fontSize: '13px',
+    outline: 'none',
+  },
+  browseBtn: {
+    padding: '8px 12px',
+    background: 'var(--bg-tertiary)',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--radius-sm)',
+    color: 'var(--text-secondary)',
+    fontSize: '12px',
+    cursor: 'pointer',
+    whiteSpace: 'nowrap' as const,
+  },
+  error: {
+    fontSize: '12px',
+    color: '#f44336',
+    padding: '6px 10px',
+    background: 'rgba(244,67,54,0.1)',
+    borderRadius: 'var(--radius-sm)',
+    border: '1px solid rgba(244,67,54,0.25)',
+    marginTop: '4px',
+  },
+  connectBtn: {
+    flex: 1,
+    padding: '9px 0',
+    background: 'var(--accent)',
+    color: '#fff',
+    border: 'none',
+    borderRadius: 'var(--radius)',
+    fontSize: '13px',
+    fontWeight: 600,
+    cursor: 'pointer',
+  },
+  cancelBtn: {
+    flex: 1,
+    padding: '9px 0',
+    background: 'transparent',
+    color: 'var(--text-muted)',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--radius)',
+    fontSize: '13px',
+    cursor: 'pointer',
   },
 }
