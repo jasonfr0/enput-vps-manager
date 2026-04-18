@@ -210,13 +210,18 @@ export default function App() {
     )
   }
 
-  // Inline style helper: show a tab pane when active, hide otherwise
+  // Inline style helper: show a tab pane when active, hide otherwise.
+  // Uses visibility:hidden + position:absolute instead of display:none so that
+  // getBoundingClientRect() returns real dimensions — xterm's FitAddon needs
+  // this to initialize at the correct size even before the tab is first visited.
   const pane = (tab: ActiveTab): React.CSSProperties => ({
-    display: activeTab === tab ? 'flex' : 'none',
-    flex: 1,
-    overflow: 'hidden',
+    position: 'absolute',
+    inset: 0,
+    display: 'flex',
     flexDirection: 'column',
-    position: 'relative',
+    overflow: 'hidden',
+    visibility: activeTab === tab ? 'visible' : 'hidden',
+    pointerEvents: activeTab === tab ? 'auto' : 'none',
   })
 
   // First-run setup: no users exist yet
@@ -288,7 +293,9 @@ export default function App() {
 
             {/* ── Persistent session tabs — always mounted while connected ── */}
             {isConnected && !serverAccessDenied && (
-              <>
+              /* position:relative so the absolute panes resolve inset:0 correctly */
+              <div style={{ position: 'relative', flex: 1, overflow: 'hidden' }}>
+
                 {/* Terminal — PTY session must survive tab switches */}
                 <div style={pane('terminal')}>
                   <TerminalView connId={activeConnId!} readOnly={isRO} isActive={activeTab === 'terminal'} />
@@ -321,16 +328,21 @@ export default function App() {
                     : <AccessDeniedMsg feature="Code Editor" />}
                 </div>
 
-                {/* Files — cheap to re-fetch, conditionally rendered */}
+                {/* Files & Monitor — stateless, conditionally rendered on top */}
                 {activeTab === 'files' && (
-                  isOp
-                    ? <FileBrowser connId={activeConnId!} onOpenFile={handleOpenFile} />
-                    : <AccessDeniedMsg feature="File Manager" />
+                  <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column' }}>
+                    {isOp
+                      ? <FileBrowser connId={activeConnId!} onOpenFile={handleOpenFile} />
+                      : <AccessDeniedMsg feature="File Manager" />}
+                  </div>
+                )}
+                {activeTab === 'monitor' && (
+                  <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column' }}>
+                    <ResourceMonitor connId={activeConnId!} />
+                  </div>
                 )}
 
-                {/* Monitor — just polls metrics, conditionally rendered */}
-                {activeTab === 'monitor' && <ResourceMonitor connId={activeConnId!} />}
-              </>
+              </div>
             )}
           </div>
 

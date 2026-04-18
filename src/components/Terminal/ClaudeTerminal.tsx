@@ -230,20 +230,16 @@ export function ClaudeTerminal({ connId, isActive = true }: ClaudeTerminalProps)
     }
   }, [connId, terminalFontSize, terminalScrollback, terminalCursorStyle, terminalCursorBlink])
 
-  // Refit when revealed after being hidden via display:none
+  // Resync PTY size when switching back to this tab
   useLayoutEffect(() => {
     if (!isActive) return
-    const wrapper = wrapperRef.current
     const fitAddon = fitAddonRef.current
-    if (!wrapper || !fitAddon) return
+    const terminal = terminalRef.current
+    if (!fitAddon || !terminal) return
     requestAnimationFrame(() => {
-      const rect = wrapper.getBoundingClientRect()
-      if (rect.width <= 0) return
-      const termEl = termRef.current
-      if (termEl) termEl.style.height = `${Math.max(1, Math.floor(window.innerHeight - rect.top))}px`
       fitAddon.fit()
-      if (shellIdRef.current && terminalRef.current) {
-        window.api.terminal.resize(connId, shellIdRef.current, terminalRef.current.cols, terminalRef.current.rows)
+      if (shellIdRef.current) {
+        window.api.terminal.resize(connId, shellIdRef.current, terminal.cols, terminal.rows)
       }
     })
   }, [isActive, connId])

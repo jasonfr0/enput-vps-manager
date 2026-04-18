@@ -142,21 +142,18 @@ export function TerminalView({ connId, readOnly = false, isActive = true }: Term
     }
   }, [connId, readOnly, terminalFontSize, terminalScrollback, terminalCursorStyle, terminalCursorBlink])
 
-  // When this tab is revealed after being hidden (display:none → flex), the
-  // ResizeObserver may not fire reliably. Force a refit on the next frame.
+  // When switching back to this tab, send the current size to the PTY in case
+  // the window was resized while this tab was hidden (visibility:hidden preserves
+  // layout so FitAddon already has correct dimensions — just resync the PTY).
   useLayoutEffect(() => {
     if (!isActive) return
-    const wrapper = wrapperRef.current
     const fitAddon = fitAddonRef.current
-    if (!wrapper || !fitAddon) return
+    const terminal = terminalRef.current
+    if (!fitAddon || !terminal) return
     requestAnimationFrame(() => {
-      const rect = wrapper.getBoundingClientRect()
-      if (rect.width <= 0) return
-      const termEl = termRef.current
-      if (termEl) termEl.style.height = `${Math.max(1, Math.floor(window.innerHeight - rect.top))}px`
       fitAddon.fit()
-      if (shellIdRef.current && terminalRef.current) {
-        window.api.terminal.resize(connId, shellIdRef.current, terminalRef.current.cols, terminalRef.current.rows)
+      if (shellIdRef.current) {
+        window.api.terminal.resize(connId, shellIdRef.current, terminal.cols, terminal.rows)
       }
     })
   }, [isActive, connId])
