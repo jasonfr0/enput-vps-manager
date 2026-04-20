@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { AlertTriangle, Check, Info, LucideIcon, X, XCircle } from 'lucide-react'
 import { useNotificationStore, Toast, NotificationType } from '../../context/useNotificationStore'
 
 // ─── Individual toast ─────────────────────────────────────────────
@@ -23,7 +24,7 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: (id: string)
     setTimeout(() => onDismiss(toast.id), 280)
   }
 
-  const { bg, border, icon } = THEME[toast.type]
+  const { bg, border, icon: Icon } = THEME[toast.type]
 
   return (
     <div
@@ -39,12 +40,14 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: (id: string)
       }}
       onClick={dismiss}
     >
-      <span style={{ ...s.icon, color: border }}>{icon}</span>
+      <span style={{ ...s.icon, color: border }}><Icon size={16} /></span>
       <div style={s.body}>
         <span style={s.title}>{toast.title}</span>
         {toast.message && <span style={s.message}>{toast.message}</span>}
       </div>
-      <button style={s.close} onClick={(e) => { e.stopPropagation(); dismiss() }}>✕</button>
+      <button style={s.close} onClick={(e) => { e.stopPropagation(); dismiss() }} title="Dismiss">
+        <X size={12} />
+      </button>
       {toast.duration && toast.duration > 0 && (
         <div
           style={{
@@ -58,11 +61,11 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: (id: string)
   )
 }
 
-const THEME: Record<NotificationType, { bg: string; border: string; icon: string }> = {
-  success: { bg: 'rgba(76, 175, 80, 0.12)',  border: '#4caf50', icon: '✓' },
-  error:   { bg: 'rgba(244, 67, 54, 0.12)',  border: '#f44336', icon: '✕' },
-  warning: { bg: 'rgba(255, 152, 0, 0.12)',  border: '#ff9800', icon: '⚠' },
-  info:    { bg: 'rgba(100, 108, 255, 0.12)', border: '#646cff', icon: 'ℹ' },
+const THEME: Record<NotificationType, { bg: string; border: string; icon: LucideIcon }> = {
+  success: { bg: 'rgba(76, 175, 80, 0.12)',  border: '#4caf50', icon: Check },
+  error:   { bg: 'rgba(244, 67, 54, 0.12)',  border: '#f44336', icon: XCircle },
+  warning: { bg: 'rgba(255, 152, 0, 0.12)',  border: '#ff9800', icon: AlertTriangle },
+  info:    { bg: 'rgba(100, 108, 255, 0.12)', border: '#646cff', icon: Info },
 }
 
 // ─── Container ────────────────────────────────────────────────────
@@ -118,9 +121,10 @@ const s: Record<string, React.CSSProperties> = {
     backdropFilter: 'blur(8px)',
   },
   icon: {
-    fontSize: 14,
-    fontWeight: 700,
-    lineHeight: '18px',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    lineHeight: 1,
     flexShrink: 0,
     marginTop: 1,
   },
@@ -148,11 +152,13 @@ const s: Record<string, React.CSSProperties> = {
     border: 'none',
     color: 'var(--text-muted)',
     cursor: 'pointer',
-    fontSize: 12,
     lineHeight: 1,
-    padding: '1px 2px',
+    padding: '2px',
     flexShrink: 0,
     marginTop: 1,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   progressBar: {
     position: 'absolute',

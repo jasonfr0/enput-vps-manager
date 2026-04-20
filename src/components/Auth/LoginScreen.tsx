@@ -1,4 +1,5 @@
 import React, { FormEvent, useEffect, useRef, useState } from 'react'
+import { Zap } from 'lucide-react'
 import { useSessionStore } from '../../context/useSessionStore'
 
 interface LoginScreenProps {
@@ -172,7 +173,7 @@ export function LoginScreen({ setupMode = false, onSetupDone }: LoginScreenProps
       <div style={styles.overlay}>
         <div style={{ ...styles.card, textAlign: 'center' }}>
           <div style={styles.logoRow}>
-            <span style={styles.logoIcon}>⚡</span>
+            <span style={styles.logoIcon}><Zap size={24} strokeWidth={2.5} /></span>
             <span style={styles.logoText}>Enput VPS</span>
           </div>
           <div style={styles.spinner}>◌</div>
@@ -190,7 +191,7 @@ export function LoginScreen({ setupMode = false, onSetupDone }: LoginScreenProps
       <div style={styles.overlay}>
         <div style={styles.card}>
           <div style={styles.logoRow}>
-            <span style={styles.logoIcon}>⚡</span>
+            <span style={styles.logoIcon}><Zap size={24} strokeWidth={2.5} /></span>
             <span style={styles.logoText}>Enput VPS</span>
           </div>
           <h1 style={styles.heading}>Welcome — Set up your admin account</h1>
@@ -241,7 +242,7 @@ export function LoginScreen({ setupMode = false, onSetupDone }: LoginScreenProps
       <div style={styles.overlay}>
         <div style={styles.card}>
           <div style={styles.logoRow}>
-            <span style={styles.logoIcon}>⚡</span>
+            <span style={styles.logoIcon}><Zap size={24} strokeWidth={2.5} /></span>
             <span style={styles.logoText}>Enput VPS</span>
           </div>
           <h1 style={styles.heading}>Sign in</h1>
@@ -288,7 +289,7 @@ export function LoginScreen({ setupMode = false, onSetupDone }: LoginScreenProps
     <div style={styles.overlay}>
       <div style={styles.card}>
         <div style={styles.logoRow}>
-          <span style={styles.logoIcon}>⚡</span>
+          <span style={styles.logoIcon}><Zap size={24} strokeWidth={2.5} /></span>
           <span style={styles.logoText}>Enput VPS</span>
         </div>
         <h1 style={styles.heading}>Sign in</h1>
@@ -378,7 +379,12 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '8px',
     marginBottom: '20px',
   },
-  logoIcon: { fontSize: '22px' },
+  logoIcon: {
+    color: 'var(--accent)',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   logoText: {
     fontSize: '16px',
     fontWeight: 700,

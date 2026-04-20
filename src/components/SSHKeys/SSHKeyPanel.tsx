@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react'
+import { RefreshCw, X } from 'lucide-react'
 import { useConnectionStore } from '../../context/useConnectionStore'
 import { notify } from '../../context/useNotificationStore'
 
@@ -261,7 +262,9 @@ export function SSHKeyPanel() {
       {error && (
         <div style={s.errorBanner}>
           {error}
-          <button style={s.errorDismiss} onClick={() => setError('')}>✕</button>
+          <button style={s.errorDismiss} onClick={() => setError('')} title="Dismiss">
+            <X size={12} />
+          </button>
         </div>
       )}
 
@@ -269,7 +272,9 @@ export function SSHKeyPanel() {
       <div style={s.sectionHeader}>
         <span style={s.sectionTitle}>LOCAL KEYS</span>
         <span style={s.sectionHint}>~/.ssh/ on this machine</span>
-        <button style={s.refreshBtn} onClick={loadLocal} title="Refresh">↻</button>
+        <button style={s.refreshBtn} onClick={loadLocal} title="Refresh">
+          <RefreshCw size={12} />
+        </button>
       </div>
 
       {loadingLocal ? (
@@ -295,7 +300,11 @@ export function SSHKeyPanel() {
       <div style={{ ...s.sectionHeader, marginTop: 24 }}>
         <span style={s.sectionTitle}>AUTHORIZED KEYS ON SERVER</span>
         <span style={s.sectionHint}>~/.ssh/authorized_keys</span>
-        {connected && <button style={s.refreshBtn} onClick={loadRemote} title="Refresh">↻</button>}
+        {connected && (
+          <button style={s.refreshBtn} onClick={loadRemote} title="Refresh">
+            <RefreshCw size={12} />
+          </button>
+        )}
       </div>
 
       {!connected ? (
@@ -345,6 +354,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   errorDismiss: {
     background: 'none', border: 'none', color: 'var(--error)', cursor: 'pointer',
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '2px',
   },
   sectionHeader: {
     display: 'flex',
@@ -370,8 +380,10 @@ const s: Record<string, React.CSSProperties> = {
     border: 'none',
     color: 'var(--text-muted)',
     cursor: 'pointer',
-    fontSize: 14,
-    padding: '0 4px',
+    padding: '2px 4px',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   placeholder: {
     padding: '14px 16px',

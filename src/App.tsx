@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { Lock } from 'lucide-react'
 import { Sidebar } from './components/Layout/Sidebar'
 import { Header } from './components/Layout/Header'
 import { TerminalView } from './components/Terminal/TerminalView'
@@ -241,7 +242,7 @@ export default function App() {
   function AccessDeniedMsg({ feature }: { feature: string }) {
     return (
       <div style={styles.emptyState}>
-        <div style={styles.emptyIcon}>🔒</div>
+        <div style={styles.emptyIcon}><Lock size={48} strokeWidth={1.5} /></div>
         <h2 style={styles.emptyTitle}>{feature} — Restricted</h2>
         <p style={styles.emptyText}>Your role (read-only) doesn't have access to this feature.</p>
       </div>
@@ -323,7 +324,7 @@ export default function App() {
             {/* Server access denied */}
             {isConnected && serverAccessDenied && (
               <div style={styles.emptyState}>
-                <div style={styles.emptyIcon}>🔒</div>
+                <div style={styles.emptyIcon}><Lock size={48} strokeWidth={1.5} /></div>
                 <h2 style={styles.emptyTitle}>Access Denied</h2>
                 <p style={styles.emptyText}>You don't have permission to access this server.</p>
               </div>
@@ -424,8 +425,10 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'var(--text-secondary)',
   },
   emptyIcon: {
-    fontSize: '48px',
+    color: 'var(--text-muted)',
     marginBottom: '8px',
+    display: 'flex',
+    justifyContent: 'center',
   },
   emptyTitle: {
     fontSize: '20px',

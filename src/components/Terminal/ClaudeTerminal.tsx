@@ -1,6 +1,7 @@
 import React, { useLayoutEffect, useRef, useState, useEffect } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
+import { ArrowUp, Folder, FolderOpen, Sparkles } from 'lucide-react'
 import { useSettingsStore } from '../../context/useSettingsStore'
 
 interface ClaudeTerminalProps {
@@ -264,7 +265,7 @@ export function ClaudeTerminal({ connId, isActive = true }: ClaudeTerminalProps)
       {/* ── Top bar ── */}
       <div style={styles.topBar}>
         <div style={styles.topBarLeft}>
-          <span style={{ fontSize: '14px' }}>✨</span>
+          <span style={styles.topBarIcon}><Sparkles size={14} /></span>
           <span style={styles.topBarTitle}>Claude Code</span>
           <span style={{
             ...styles.statusBadge,
@@ -290,7 +291,8 @@ export function ClaudeTerminal({ connId, isActive = true }: ClaudeTerminalProps)
           )}
           {claudeStatus === 'ready' && (
             <button style={styles.actionBtn} onClick={handleLaunchClaude}>
-              Launch Claude ✨
+              <Sparkles size={13} style={{ marginRight: '5px', verticalAlign: '-2px' }} />
+              Launch Claude
             </button>
           )}
           {(claudeStatus === 'not-installed' || claudeStatus === 'checking') && (
@@ -317,7 +319,7 @@ export function ClaudeTerminal({ connId, isActive = true }: ClaudeTerminalProps)
         />
         {!isRunning && (
           <button style={styles.browseBtn} onClick={openPicker} title="Browse directories">
-            📂
+            <FolderOpen size={14} />
           </button>
         )}
       </div>
@@ -356,7 +358,8 @@ export function ClaudeTerminal({ connId, isActive = true }: ClaudeTerminalProps)
               </div>
               <div style={{ display: 'flex', gap: '6px' }}>
                 <button style={styles.pickerUpBtn} onClick={pickerUp} disabled={pickerPath === '/'} title="Go up">
-                  ↑ Up
+                  <ArrowUp size={13} style={{ marginRight: '4px', verticalAlign: '-2px' }} />
+                  Up
                 </button>
                 <button style={{ ...styles.actionBtn, background: 'var(--accent)' }} onClick={pickerSelect}>
                   Select
@@ -386,7 +389,7 @@ export function ClaudeTerminal({ connId, isActive = true }: ClaudeTerminalProps)
                   onDoubleClick={pickerSelect}
                   title={`Double-click to select ${entry.path}`}
                 >
-                  <span style={{ marginRight: 6 }}>📁</span>
+                  <Folder size={13} style={{ marginRight: 6, verticalAlign: '-2px', flexShrink: 0 }} />
                   {entry.name}
                 </button>
               ))}
@@ -423,6 +426,12 @@ const styles: Record<string, React.CSSProperties> = {
     flexShrink: 0,
   },
   topBarLeft: { display: 'flex', alignItems: 'center', gap: '8px' },
+  topBarIcon: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: 'var(--accent)',
+  },
   topBarTitle: { fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' },
   statusBadge: {
     fontSize: '10px', fontWeight: 600, color: '#fff',

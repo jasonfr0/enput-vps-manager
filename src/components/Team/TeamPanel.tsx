@@ -1,4 +1,5 @@
 import React, { FormEvent, useEffect, useState } from 'react'
+import { ArrowLeft, Lock } from 'lucide-react'
 import { TeamUser, UserRole } from '../../types/api'
 import { useSessionStore, ROLE_LABELS, ROLE_DESCRIPTIONS } from '../../context/useSessionStore'
 import { useConnectionStore } from '../../context/useConnectionStore'
@@ -217,7 +218,9 @@ export function TeamPanel() {
     return (
       <div style={styles.root}>
         <div style={{ ...styles.center, color: 'var(--text-muted)' }}>
-          <div style={{ fontSize: '32px', marginBottom: '10px' }}>🔒</div>
+          <div style={{ marginBottom: '10px', display: 'flex', justifyContent: 'center' }}>
+            <Lock size={32} strokeWidth={1.5} />
+          </div>
           <p>Admin access required to manage team members.</p>
         </div>
       </div>
@@ -228,7 +231,10 @@ export function TeamPanel() {
     return (
       <div style={styles.root}>
         <div style={styles.toolbar}>
-          <button style={styles.backBtn} onClick={back}>← Back</button>
+          <button style={styles.backBtn} onClick={back}>
+            <ArrowLeft size={13} style={{ marginRight: '4px', verticalAlign: '-2px' }} />
+            Back
+          </button>
           <span style={styles.title}>Add team member</span>
         </div>
         <div style={styles.formWrap}>
@@ -270,7 +276,10 @@ export function TeamPanel() {
     return (
       <div style={styles.root}>
         <div style={styles.toolbar}>
-          <button style={styles.backBtn} onClick={back}>← Back</button>
+          <button style={styles.backBtn} onClick={back}>
+            <ArrowLeft size={13} style={{ marginRight: '4px', verticalAlign: '-2px' }} />
+            Back
+          </button>
           <span style={styles.title}>Edit {editTarget.username}</span>
         </div>
         <div style={styles.formWrap}>
@@ -300,7 +309,10 @@ export function TeamPanel() {
     return (
       <div style={styles.root}>
         <div style={styles.toolbar}>
-          <button style={styles.backBtn} onClick={back}>← Back</button>
+          <button style={styles.backBtn} onClick={back}>
+            <ArrowLeft size={13} style={{ marginRight: '4px', verticalAlign: '-2px' }} />
+            Back
+          </button>
           <span style={styles.title}>Change password — {editTarget.username}</span>
         </div>
         <div style={styles.formWrap}>

@@ -1,4 +1,17 @@
 import React, { useEffect, useState } from 'react'
+import {
+  Activity,
+  Bot,
+  ClipboardList,
+  Clock,
+  FileCode2,
+  FolderClosed,
+  LucideIcon,
+  Settings,
+  Sparkles,
+  Terminal as TerminalIcon,
+  Users,
+} from 'lucide-react'
 import { ActiveTab } from '../../App'
 import { useConnectionStore } from '../../context/useConnectionStore'
 
@@ -6,16 +19,16 @@ interface HeaderProps {
   activeTab: ActiveTab
 }
 
-const tabMeta: Record<ActiveTab, { label: string; icon: string; shortcut: string }> = {
-  terminal:   { label: 'SSH Terminal',       icon: '>_', shortcut: 'Ctrl+1' },
-  files:      { label: 'File Manager',       icon: '📁', shortcut: 'Ctrl+2' },
-  editor:     { label: 'Code Editor',        icon: '📝', shortcut: 'Ctrl+3' },
-  chat:       { label: 'Claude Chat',        icon: '🤖', shortcut: 'Ctrl+4' },
-  'claude-cli': { label: 'Claude Code CLI',  icon: '✨', shortcut: 'Ctrl+5' },
-  monitor:    { label: 'Resource Monitor',   icon: '📊', shortcut: 'Ctrl+6' },
-  settings:   { label: 'Settings',           icon: '⚙️', shortcut: 'Ctrl+,' },
-  audit:      { label: 'Audit Log',          icon: '📋', shortcut: 'Ctrl+7' },
-  team:       { label: 'Team',               icon: '👥', shortcut: '' },
+const tabMeta: Record<ActiveTab, { label: string; icon: LucideIcon; shortcut: string }> = {
+  terminal:     { label: 'SSH Terminal',       icon: TerminalIcon,  shortcut: 'Ctrl+1' },
+  files:        { label: 'File Manager',       icon: FolderClosed,  shortcut: 'Ctrl+2' },
+  editor:       { label: 'Code Editor',        icon: FileCode2,     shortcut: 'Ctrl+3' },
+  chat:         { label: 'Claude Chat',        icon: Bot,           shortcut: 'Ctrl+4' },
+  'claude-cli': { label: 'Claude Code CLI',    icon: Sparkles,      shortcut: 'Ctrl+5' },
+  monitor:      { label: 'Resource Monitor',   icon: Activity,      shortcut: 'Ctrl+6' },
+  settings:     { label: 'Settings',           icon: Settings,      shortcut: 'Ctrl+,' },
+  audit:        { label: 'Audit Log',          icon: ClipboardList, shortcut: 'Ctrl+7' },
+  team:         { label: 'Team',               icon: Users,         shortcut: '' },
 }
 
 function useUptime(connected: boolean) {
@@ -42,11 +55,12 @@ export function Header({ activeTab }: HeaderProps) {
   const activeServer = servers.find((s) => s.id === activeServerId)
   const meta = tabMeta[activeTab]
   const uptime = useUptime(connectionStatus === 'connected')
+  const TabIcon = meta.icon
 
   return (
     <div style={styles.header}>
       <div style={styles.left}>
-        <span style={styles.tabIcon}>{meta.icon}</span>
+        <span style={styles.tabIcon}><TabIcon size={16} /></span>
         <h1 style={styles.title}>{meta.label}</h1>
         {activeServer && connectionStatus === 'connected' && (
           <span style={styles.serverBadge}>
@@ -65,7 +79,8 @@ export function Header({ activeTab }: HeaderProps) {
       <div style={styles.right}>
         {uptime && (
           <span style={styles.uptime} data-tooltip="Session uptime">
-            ⏱ {uptime}
+            <Clock size={12} style={{ marginRight: '4px', verticalAlign: '-2px' }} />
+            {uptime}
           </span>
         )}
         <span style={styles.shortcutHint}>{meta.shortcut}</span>
@@ -95,7 +110,10 @@ const styles: Record<string, React.CSSProperties> = {
     minWidth: 0,
   },
   tabIcon: {
-    fontSize: '15px',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: 'var(--text-secondary)',
     flexShrink: 0,
   },
   title: {

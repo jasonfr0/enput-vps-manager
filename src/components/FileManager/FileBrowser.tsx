@@ -1,4 +1,29 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react'
+import {
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  ChevronUp,
+  Database,
+  Eye,
+  EyeOff,
+  File,
+  FileArchive,
+  FileImage,
+  FileKey,
+  FileText,
+  FileVideo,
+  Folder,
+  FolderPlus,
+  Link2,
+  Lock,
+  type LucideIcon,
+  Music,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Trash2,
+  X,
+} from 'lucide-react'
 import { useFileStore } from '../../context/useFileStore'
 
 interface FileBrowserProps {
@@ -7,26 +32,35 @@ interface FileBrowserProps {
 }
 
 // ─── File icon / color by extension ──────────────────────────────
-function getFileIcon(name: string, type: string): string {
-  if (type === 'directory') return '📁'
-  if (type === 'symlink') return '🔗'
+// Short text tokens used for languages that read better as labels than as icons.
+const TEXT_LABEL: Record<string, string> = {
+  js: 'JS', jsx: 'JSX', ts: 'TS', tsx: 'TSX',
+  go: 'GO', rs: 'RS', rb: 'RB', py: 'PY',
+  sh: 'SH', bash: 'SH', zsh: 'SH',
+  php: 'PHP', java: 'JAVA', c: 'C', cpp: 'C++', cs: 'C#',
+  html: 'HTML', htm: 'HTML', css: 'CSS', scss: 'SCSS', sass: 'SASS',
+  json: 'JSON', yaml: 'YML', yml: 'YML', toml: 'TOML', xml: 'XML',
+  svg: 'SVG',
+}
+
+const ICON_ICON: Record<string, LucideIcon> = {
+  md: FileText, txt: FileText, rst: FileText, log: FileText,
+  png: FileImage, jpg: FileImage, jpeg: FileImage, gif: FileImage, webp: FileImage, ico: FileImage,
+  zip: FileArchive, tar: FileArchive, gz: FileArchive, bz2: FileArchive, xz: FileArchive,
+  db: Database, sqlite: Database, sql: Database,
+  env: Lock, key: FileKey, pem: FileKey, crt: FileKey,
+  mp4: FileVideo, mkv: FileVideo, webm: FileVideo,
+  mp3: Music, wav: Music, flac: Music,
+}
+
+function getFileIcon(name: string, type: string): React.ReactNode {
+  if (type === 'directory') return <Folder size={14} />
+  if (type === 'symlink') return <Link2 size={14} />
   const ext = name.split('.').pop()?.toLowerCase() ?? ''
-  const map: Record<string, string> = {
-    js: 'JS', jsx: 'JSX', ts: 'TS', tsx: 'TSX',
-    py: '🐍', rb: '💎', go: 'GO', rs: '🦀',
-    sh: '$', bash: '$', zsh: '$',
-    php: 'PHP', java: '☕', c: 'C', cpp: 'C++', cs: 'C#',
-    html: '🌐', htm: '🌐', css: '🎨', scss: '🎨', sass: '🎨',
-    json: '{ }', yaml: '—', yml: '—', toml: '—', xml: '< >',
-    svg: '✦',
-    md: '≡', txt: '≡', rst: '≡', log: '📋',
-    png: '🖼', jpg: '🖼', jpeg: '🖼', gif: '🖼', webp: '🖼', ico: '🖼',
-    zip: '📦', tar: '📦', gz: '📦', bz2: '📦', xz: '📦',
-    db: '🗄', sqlite: '🗄', sql: '🗄',
-    env: '🔒', key: '🔒', pem: '🔒', crt: '🔒',
-    mp4: '🎬', mkv: '🎬', mp3: '🎵', wav: '🎵',
-  }
-  return map[ext] ?? '📄'
+  if (TEXT_LABEL[ext]) return TEXT_LABEL[ext]
+  const Icon = ICON_ICON[ext]
+  if (Icon) return <Icon size={14} />
+  return <File size={14} />
 }
 
 function getIconColor(name: string, type: string): string {
@@ -303,10 +337,10 @@ export function FileBrowser({ connId, onOpenFile }: FileBrowserProps) {
       {/* ── Toolbar ─────────────────────────────────────────── */}
       <div style={s.toolbar}>
         <button style={s.toolBtn} onClick={handleGoUp} title="Go up (..)" disabled={currentPath === '/'}>
-          ↑
+          <ChevronUp size={14} />
         </button>
         <button style={s.toolBtn} onClick={() => loadDirectory(currentPath)} title="Refresh">
-          ↻
+          <RefreshCw size={13} />
         </button>
         <Breadcrumb path={currentPath} onNavigate={loadDirectory} />
         <div style={s.toolbarRight}>
@@ -315,12 +349,19 @@ export function FileBrowser({ connId, onOpenFile }: FileBrowserProps) {
             onClick={() => setShowHidden(v => !v)}
             title={showHidden ? 'Hide dotfiles' : `Show hidden files (${hiddenCount})`}
           >
-            {showHidden ? '👁' : '🙈'}
+            {showHidden ? <Eye size={14} /> : <EyeOff size={14} />}
           </button>
-          <button style={s.toolBtn} onClick={() => startNew('file')} title="New file">＋ File</button>
-          <button style={s.toolBtn} onClick={() => startNew('folder')} title="New folder">＋ Folder</button>
+          <button style={s.toolBtn} onClick={() => startNew('file')} title="New file">
+            <Plus size={13} style={s.toolBtnIcon} />
+            File
+          </button>
+          <button style={s.toolBtn} onClick={() => startNew('folder')} title="New folder">
+            <FolderPlus size={13} style={s.toolBtnIcon} />
+            Folder
+          </button>
           <button style={{ ...s.toolBtn, ...s.uploadBtn }} onClick={handleUpload} title="Upload files">
-            ↑ Upload
+            <ArrowUpFromLine size={13} style={s.toolBtnIcon} />
+            Upload
           </button>
         </div>
       </div>
@@ -329,7 +370,9 @@ export function FileBrowser({ connId, onOpenFile }: FileBrowserProps) {
       {error && (
         <div style={s.errorBanner}>
           <span>{error}</span>
-          <button style={s.dismissBtn} onClick={() => setError(null)}>✕</button>
+          <button style={s.dismissBtn} onClick={() => setError(null)} title="Dismiss">
+            <X size={12} />
+          </button>
         </div>
       )}
 
@@ -353,8 +396,8 @@ export function FileBrowser({ connId, onOpenFile }: FileBrowserProps) {
         {/* New item input row */}
         {newItemMode && (
           <div style={s.newItemRow}>
-            <span style={{ marginRight: 8, fontSize: 14 }}>
-              {newItemMode === 'folder' ? '📁' : '📄'}
+            <span style={{ marginRight: 8, display: 'inline-flex', alignItems: 'center', color: 'var(--text-muted)' }}>
+              {newItemMode === 'folder' ? <Folder size={14} /> : <File size={14} />}
             </span>
             <input
               ref={newItemInputRef}
@@ -368,7 +411,9 @@ export function FileBrowser({ connId, onOpenFile }: FileBrowserProps) {
               placeholder={newItemMode === 'folder' ? 'folder-name' : 'file.txt'}
             />
             <button style={s.editBtn} onClick={commitNew}>Create</button>
-            <button style={s.cancelBtn} onClick={() => { setNewItemMode(null); setNewItemName('') }}>✕</button>
+            <button style={s.cancelBtn} onClick={() => { setNewItemMode(null); setNewItemName('') }} title="Cancel">
+              <X size={12} />
+            </button>
           </div>
         )}
 
@@ -397,7 +442,7 @@ export function FileBrowser({ connId, onOpenFile }: FileBrowserProps) {
                 }}
               >
                 {/* Name column */}
-                <span style={{ ...s.col, flex: 3, minWidth: 0, gap: 6 }}>
+                <span style={{ ...s.col, flex: 3, minWidth: 0, gap: 6, alignItems: 'center' }}>
                   <span style={{ ...s.iconBadge, color: iconColor }}>{icon}</span>
                   {isRenaming ? (
                     <input
@@ -448,7 +493,7 @@ export function FileBrowser({ connId, onOpenFile }: FileBrowserProps) {
 
                   {isOpenable(entry) && (
                     <button style={s.actionBtn} onClick={e => { e.stopPropagation(); handleDownload(entry) }} title="Download">
-                      ↓
+                      <ArrowDownToLine size={12} />
                     </button>
                   )}
 
@@ -457,7 +502,7 @@ export function FileBrowser({ connId, onOpenFile }: FileBrowserProps) {
                     onClick={e => { e.stopPropagation(); startRename(entry) }}
                     title="Rename"
                   >
-                    ✎
+                    <Pencil size={12} />
                   </button>
 
                   <button
@@ -465,7 +510,7 @@ export function FileBrowser({ connId, onOpenFile }: FileBrowserProps) {
                     onClick={e => { e.stopPropagation(); handleDelete(entry) }}
                     title="Delete"
                   >
-                    🗑
+                    <Trash2 size={12} />
                   </button>
                 </span>
               </div>
@@ -526,6 +571,9 @@ const s: Record<string, React.CSSProperties> = {
     flexShrink: 0,
   },
   toolBtn: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '5px',
     padding: '3px 8px',
     border: '1px solid var(--border)',
     borderRadius: 'var(--radius-sm)',
@@ -534,6 +582,9 @@ const s: Record<string, React.CSSProperties> = {
     fontSize: '12px',
     cursor: 'pointer',
     whiteSpace: 'nowrap' as const,
+    flexShrink: 0,
+  },
+  toolBtnIcon: {
     flexShrink: 0,
   },
   uploadBtn: {
@@ -557,9 +608,12 @@ const s: Record<string, React.CSSProperties> = {
     border: 'none',
     color: 'var(--error)',
     cursor: 'pointer',
-    fontSize: '14px',
     lineHeight: 1,
     flexShrink: 0,
+    padding: '2px',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   fileList: {
     flex: 1,
@@ -604,10 +658,12 @@ const s: Record<string, React.CSSProperties> = {
     transition: 'background 100ms',
   },
   iconBadge: {
-    fontSize: '13px',
+    fontSize: '11px',
     flexShrink: 0,
     minWidth: 20,
-    textAlign: 'center' as const,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
     fontFamily: 'var(--font-mono)',
     fontWeight: 600,
     lineHeight: 1,
@@ -653,7 +709,7 @@ const s: Record<string, React.CSSProperties> = {
     flexShrink: 0,
   },
   actionBtn: {
-    padding: '2px 6px',
+    padding: '3px 6px',
     border: '1px solid var(--border)',
     borderRadius: 'var(--radius-sm)',
     background: 'transparent',
@@ -661,9 +717,12 @@ const s: Record<string, React.CSSProperties> = {
     fontSize: '12px',
     cursor: 'pointer',
     flexShrink: 0,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   cancelBtn: {
-    padding: '2px 6px',
+    padding: '3px 6px',
     border: '1px solid var(--border)',
     borderRadius: 'var(--radius-sm)',
     background: 'transparent',
@@ -671,9 +730,12 @@ const s: Record<string, React.CSSProperties> = {
     fontSize: '12px',
     cursor: 'pointer',
     flexShrink: 0,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   delBtn: {
-    padding: '2px 6px',
+    padding: '3px 6px',
     border: '1px solid var(--border)',
     borderRadius: 'var(--radius-sm)',
     background: 'transparent',
@@ -681,6 +743,9 @@ const s: Record<string, React.CSSProperties> = {
     fontSize: '12px',
     cursor: 'pointer',
     flexShrink: 0,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   emptyMsg: {
     padding: '32px',

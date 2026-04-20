@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import Editor, { DiffEditor, OnMount, loader } from '@monaco-editor/react'
 import type { editor } from 'monaco-editor'
+import { Check, GitCompare } from 'lucide-react'
 import { useSettingsStore } from '../../context/useSettingsStore'
 
 // Configure Monaco to load workers from CDN (works in Electron without extra bundler config)
@@ -143,7 +144,7 @@ function DiffOverlay({
       {/* Header */}
       <div style={diffStyles.header}>
         <div style={diffStyles.headerLeft}>
-          <span style={diffStyles.headerIcon}>⟳</span>
+          <span style={diffStyles.headerIcon}><GitCompare size={16} /></span>
           <div>
             <div style={diffStyles.headerTitle}>Review Changes</div>
             <div style={diffStyles.headerPath}>{filePath}</div>
@@ -204,7 +205,14 @@ function DiffOverlay({
             Cancel
           </button>
           <button style={diffStyles.confirmBtn} onClick={onConfirm} disabled={isSaving}>
-            {isSaving ? 'Saving...' : '✓ Confirm & Save'}
+            {isSaving ? (
+              'Saving...'
+            ) : (
+              <>
+                <Check size={14} style={{ marginRight: '6px', verticalAlign: '-2px' }} />
+                Confirm & Save
+              </>
+            )}
           </button>
         </div>
       </div>
@@ -443,7 +451,8 @@ export function CodeEditor({
               onClick={handleSaveRequest}
               title="Preview changes before saving"
             >
-              ⟳ Diff
+              <GitCompare size={13} style={{ marginRight: '5px', verticalAlign: '-2px' }} />
+              Diff
             </button>
           )}
           <button
@@ -697,7 +706,9 @@ const diffStyles: Record<string, React.CSSProperties> = {
     minWidth: 0,
   },
   headerIcon: {
-    fontSize: '20px',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
     color: 'var(--warning)',
     flexShrink: 0,
   },

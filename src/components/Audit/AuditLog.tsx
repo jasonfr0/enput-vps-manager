@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { Download, RefreshCw, Trash2, X } from 'lucide-react'
 import { AuditEntry } from '../../types/api'
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -117,14 +118,17 @@ export function AuditLog() {
         </div>
         <div style={styles.toolbarRight}>
           <button style={styles.btn} onClick={handleRefresh} title="Refresh">
-            ↻ Refresh
+            <RefreshCw size={13} style={styles.btnIcon} />
+            Refresh
           </button>
           <button style={styles.btn} onClick={handleExportCsv} title="Export CSV">
-            ⬇ Export CSV
+            <Download size={13} style={styles.btnIcon} />
+            Export CSV
           </button>
           {!confirmClear ? (
             <button style={{ ...styles.btn, ...styles.btnDanger }} onClick={() => setConfirmClear(true)}>
-              🗑 Clear All
+              <Trash2 size={13} style={styles.btnIcon} />
+              Clear All
             </button>
           ) : (
             <span style={styles.confirmRow}>
@@ -183,7 +187,8 @@ export function AuditLog() {
               load('')
             }}
           >
-            ✕ Clear filters
+            <X size={12} style={styles.btnIcon} />
+            Clear filters
           </button>
         )}
       </div>
@@ -317,6 +322,9 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: '10px',
   },
   btn: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '6px',
     padding: '5px 12px',
     border: '1px solid var(--border)',
     borderRadius: 'var(--radius-sm)',
@@ -325,6 +333,9 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '12px',
     cursor: 'pointer',
     whiteSpace: 'nowrap' as const,
+  },
+  btnIcon: {
+    flexShrink: 0,
   },
   btnDanger: {
     borderColor: 'rgba(244,67,54,0.4)',
@@ -390,6 +401,9 @@ const styles: Record<string, React.CSSProperties> = {
     colorScheme: 'dark',
   },
   clearFilters: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '4px',
     padding: '4px 10px',
     border: 'none',
     background: 'transparent',

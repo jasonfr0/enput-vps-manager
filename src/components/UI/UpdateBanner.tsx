@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { AlertTriangle, ArrowUpCircle, Check, Download, X } from 'lucide-react'
 import { useUpdateStore } from '../../context/useUpdateStore'
 
 function formatBytes(bytes: number): string {
@@ -26,10 +27,12 @@ export function UpdateBanner() {
   if (status === 'error') {
     return (
       <div style={{ ...s.banner, background: 'rgba(244,67,54,0.12)', borderColor: 'rgba(244,67,54,0.35)' }}>
-        <span style={s.icon}>⚠</span>
+        <span style={{ ...s.icon, color: '#f44336' }}><AlertTriangle size={14} /></span>
         <span style={s.text}>Update check failed: {error}</span>
         <button style={s.actionBtn} onClick={() => check()}>Retry</button>
-        <button style={s.dismissBtn} onClick={() => setDismissed(true)}>✕</button>
+        <button style={s.dismissBtn} onClick={() => setDismissed(true)} title="Dismiss">
+          <X size={14} />
+        </button>
       </div>
     )
   }
@@ -37,7 +40,7 @@ export function UpdateBanner() {
   if (status === 'available') {
     return (
       <div style={{ ...s.banner, background: 'rgba(108,99,255,0.1)', borderColor: 'rgba(108,99,255,0.35)' }}>
-        <span style={s.icon}>↑</span>
+        <span style={s.icon}><ArrowUpCircle size={14} /></span>
         <span style={s.text}>
           Version <strong style={{ color: 'var(--text-primary)' }}>{version}</strong> is available.
           {releaseNotes && (
@@ -49,7 +52,9 @@ export function UpdateBanner() {
         <button style={{ ...s.actionBtn, background: 'var(--accent)' }} onClick={() => download()}>
           Download
         </button>
-        <button style={s.dismissBtn} onClick={() => setDismissed(true)}>✕</button>
+        <button style={s.dismissBtn} onClick={() => setDismissed(true)} title="Dismiss">
+          <X size={14} />
+        </button>
         {showNotes && releaseNotes && (
           <div style={s.notesPopout}>
             <pre style={s.notesPre}>{releaseNotes}</pre>
@@ -62,7 +67,7 @@ export function UpdateBanner() {
   if (status === 'downloading' && progress) {
     return (
       <div style={{ ...s.banner, background: 'rgba(63,142,245,0.1)', borderColor: 'rgba(63,142,245,0.3)' }}>
-        <span style={s.icon}>⬇</span>
+        <span style={s.icon}><Download size={14} /></span>
         <div style={s.progressWrap}>
           <div style={s.progressRow}>
             <span style={s.text}>
@@ -90,7 +95,7 @@ export function UpdateBanner() {
   if (status === 'ready') {
     return (
       <div style={{ ...s.banner, background: 'rgba(76,175,80,0.1)', borderColor: 'rgba(76,175,80,0.35)' }}>
-        <span style={{ ...s.icon, color: 'var(--success)' }}>✓</span>
+        <span style={{ ...s.icon, color: 'var(--success)' }}><Check size={14} /></span>
         <span style={s.text}>
           Version <strong style={{ color: 'var(--text-primary)' }}>{version}</strong> is ready to install.
         </span>
@@ -100,7 +105,9 @@ export function UpdateBanner() {
         >
           Restart &amp; Install
         </button>
-        <button style={s.dismissBtn} onClick={() => setDismissed(true)}>✕</button>
+        <button style={s.dismissBtn} onClick={() => setDismissed(true)} title="Dismiss">
+          <X size={14} />
+        </button>
       </div>
     )
   }
@@ -122,7 +129,9 @@ const s: Record<string, React.CSSProperties> = {
     flexWrap: 'wrap' as const,
   },
   icon: {
-    fontSize: '14px',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
     color: 'var(--accent)',
     flexShrink: 0,
   },
@@ -164,10 +173,12 @@ const s: Record<string, React.CSSProperties> = {
     border: 'none',
     color: 'var(--text-muted)',
     cursor: 'pointer',
-    fontSize: '14px',
-    padding: '0 4px',
+    padding: '2px 4px',
     flexShrink: 0,
     lineHeight: 1,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   progressWrap: {
     flex: 1,

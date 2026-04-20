@@ -1,4 +1,20 @@
 import React, { FormEvent, useState } from 'react'
+import {
+  Activity,
+  Bot,
+  ClipboardList,
+  FileCode2,
+  FolderClosed,
+  LogOut,
+  LucideIcon,
+  Plus,
+  Settings,
+  Sparkles,
+  Terminal as TerminalIcon,
+  Users,
+  X,
+  Zap,
+} from 'lucide-react'
 import { ActiveTab } from '../../App'
 import { useConnectionStore } from '../../context/useConnectionStore'
 import { useSessionStore, ROLE_LABELS } from '../../context/useSessionStore'
@@ -10,14 +26,14 @@ interface SidebarProps {
   onOpenSettings: () => void
 }
 
-const tabs: { id: ActiveTab; label: string; icon: string; shortcut: string }[] = [
-  { id: 'terminal',   label: 'Terminal',    icon: '>_', shortcut: '⌃1' },
-  { id: 'files',      label: 'Files',       icon: '📁', shortcut: '⌃2' },
-  { id: 'editor',     label: 'Editor',      icon: '📝', shortcut: '⌃3' },
-  { id: 'chat',       label: 'Claude Chat', icon: '🤖', shortcut: '⌃4' },
-  { id: 'claude-cli', label: 'Claude Code', icon: '✨', shortcut: '⌃5' },
-  { id: 'monitor',    label: 'Monitor',     icon: '📊', shortcut: '⌃6' },
-  { id: 'audit',      label: 'Audit Log',   icon: '📋', shortcut: '⌃7' },
+const tabs: { id: ActiveTab; label: string; icon: LucideIcon; shortcut: string }[] = [
+  { id: 'terminal',   label: 'Terminal',    icon: TerminalIcon,    shortcut: '⌃1' },
+  { id: 'files',      label: 'Files',       icon: FolderClosed,    shortcut: '⌃2' },
+  { id: 'editor',     label: 'Editor',      icon: FileCode2,       shortcut: '⌃3' },
+  { id: 'chat',       label: 'Claude Chat', icon: Bot,             shortcut: '⌃4' },
+  { id: 'claude-cli', label: 'Claude Code', icon: Sparkles,        shortcut: '⌃5' },
+  { id: 'monitor',    label: 'Monitor',     icon: Activity,        shortcut: '⌃6' },
+  { id: 'audit',      label: 'Audit Log',   icon: ClipboardList,   shortcut: '⌃7' },
 ]
 
 // ── Credential prompt modal ───────────────────────────────────────────────────
@@ -92,7 +108,9 @@ function CredentialModal({
       <div style={credStyles.modal}>
         <div style={credStyles.header}>
           <span style={credStyles.title}>Enter SSH credentials</span>
-          <button style={credStyles.closeBtn} onClick={onCancel}>×</button>
+          <button style={credStyles.closeBtn} onClick={onCancel} title="Close">
+            <X size={16} />
+          </button>
         </div>
         <div style={credStyles.serverInfo}>
           <span style={credStyles.serverName}>{prompt.name}</span>
@@ -242,25 +260,30 @@ export function Sidebar({ activeTab, onTabChange, onAddServer, onOpenSettings }:
       )}
       {/* Logo */}
       <div style={styles.logo}>
-        <span style={styles.logoIcon}>⚡</span>
+        <span style={styles.logoIcon}>
+          <Zap size={16} strokeWidth={2.5} />
+        </span>
         <span style={styles.logoText}>Enput VPS</span>
       </div>
 
       {/* Navigation */}
       <nav style={styles.nav}>
         <div style={styles.sectionLabel}>Navigation</div>
-        {tabs.filter(tab => tab.id !== 'audit' || true).map((tab) => (
-          <button
-            key={tab.id}
-            className={`nav-item${activeTab === tab.id ? ' active' : ''}`}
-            onClick={() => onTabChange(tab.id)}
-            data-tooltip={`${tab.label} (Ctrl+${tab.shortcut.replace('⌃', '')})`}
-          >
-            <span style={styles.navIcon}>{tab.icon}</span>
-            <span style={styles.navLabel}>{tab.label}</span>
-            <span className="shortcut-badge">{tab.shortcut}</span>
-          </button>
-        ))}
+        {tabs.filter(tab => tab.id !== 'audit' || true).map((tab) => {
+          const Icon = tab.icon
+          return (
+            <button
+              key={tab.id}
+              className={`nav-item${activeTab === tab.id ? ' active' : ''}`}
+              onClick={() => onTabChange(tab.id)}
+              data-tooltip={`${tab.label} (Ctrl+${tab.shortcut.replace('⌃', '')})`}
+            >
+              <span style={styles.navIcon}><Icon size={15} /></span>
+              <span style={styles.navLabel}>{tab.label}</span>
+              <span className="shortcut-badge">{tab.shortcut}</span>
+            </button>
+          )
+        })}
         {/* Team tab — admin only */}
         {userIsAdmin && (
           <button
@@ -268,7 +291,7 @@ export function Sidebar({ activeTab, onTabChange, onAddServer, onOpenSettings }:
             onClick={() => onTabChange('team')}
             data-tooltip="Team (admin)"
           >
-            <span style={styles.navIcon}>👥</span>
+            <span style={styles.navIcon}><Users size={15} /></span>
             <span style={styles.navLabel}>Team</span>
           </button>
         )}
@@ -278,7 +301,9 @@ export function Sidebar({ activeTab, onTabChange, onAddServer, onOpenSettings }:
       <div style={styles.servers}>
         <div style={styles.sectionHeader}>
           <span style={styles.sectionLabel}>Servers</span>
-          <button style={styles.addBtn} onClick={onAddServer} title="Add server">+</button>
+          <button style={styles.addBtn} onClick={onAddServer} title="Add server">
+            <Plus size={13} />
+          </button>
         </div>
 
         <div style={styles.serverList}>
@@ -316,7 +341,7 @@ export function Sidebar({ activeTab, onTabChange, onAddServer, onOpenSettings }:
                     onClick={(e) => { e.stopPropagation(); handleDeleteServer(server.id) }}
                     title="Delete server"
                   >
-                    ×
+                    <X size={12} />
                   </button>
                 </div>
 
@@ -351,7 +376,7 @@ export function Sidebar({ activeTab, onTabChange, onAddServer, onOpenSettings }:
           onClick={onOpenSettings}
           style={{ margin: '0 0 4px 0' }}
         >
-          <span style={styles.navIcon}>⚙️</span>
+          <span style={styles.navIcon}><Settings size={15} /></span>
           <span style={styles.navLabel}>Settings</span>
           <span className="shortcut-badge">⌃,</span>
         </button>
@@ -381,7 +406,7 @@ export function Sidebar({ activeTab, onTabChange, onAddServer, onOpenSettings }:
               logout()
             }}
           >
-            ↩
+            <LogOut size={13} />
           </button>
         </div>
       )}
@@ -427,7 +452,12 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '14px 16px',
     borderBottom: '1px solid var(--border)',
   },
-  logoIcon: { fontSize: '18px' },
+  logoIcon: {
+    color: 'var(--accent)',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   logoText: {
     fontSize: '15px',
     fontWeight: 700,
@@ -448,8 +478,9 @@ const styles: Record<string, React.CSSProperties> = {
   },
   navIcon: {
     width: '18px',
-    textAlign: 'center' as const,
-    fontSize: '13px',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
     flexShrink: 0,
   },
   navLabel: {
@@ -475,7 +506,7 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 'var(--radius-sm)',
     background: 'transparent',
     color: 'var(--text-secondary)',
-    fontSize: '15px',
+    padding: 0,
     lineHeight: 1,
     cursor: 'pointer',
     display: 'flex',
@@ -536,8 +567,8 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: '50%',
     background: 'transparent',
     color: 'var(--text-muted)',
-    fontSize: '14px',
     cursor: 'pointer',
+    padding: 0,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -618,7 +649,7 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 'var(--radius-sm)',
     background: 'transparent',
     color: 'var(--text-muted)',
-    fontSize: '13px',
+    padding: 0,
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
@@ -678,10 +709,12 @@ const credStyles: Record<string, React.CSSProperties> = {
     background: 'none',
     border: 'none',
     color: 'var(--text-muted)',
-    fontSize: '18px',
     cursor: 'pointer',
     lineHeight: 1,
-    padding: '0 2px',
+    padding: '2px',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   serverInfo: {
     display: 'flex',
