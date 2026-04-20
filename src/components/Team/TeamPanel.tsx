@@ -1,5 +1,5 @@
 import React, { FormEvent, useEffect, useState } from 'react'
-import { ArrowLeft, Lock, Plus, Server, Users } from 'lucide-react'
+import { ArrowLeft, KeyRound, Loader2, Lock, Pencil, Plus, Server, Trash2, Users } from 'lucide-react'
 import { TeamUser, UserRole } from '../../types/api'
 import { useSessionStore, ROLE_LABELS, ROLE_DESCRIPTIONS } from '../../context/useSessionStore'
 import { useConnectionStore } from '../../context/useConnectionStore'
@@ -14,23 +14,38 @@ type View = 'list' | 'add' | 'edit' | 'password'
 
 const ROLES: UserRole[] = ['admin', 'operator', 'readonly']
 
+// Role badges: brand green for admin (privileged), neutral for operator,
+// warning amber for read-only. Uses Enput semantic tokens so a future
+// palette tweak only touches :root.
 function Badge({ role }: { role: UserRole }) {
-  const colors: Record<UserRole, string> = {
-    admin:    '#6c63ff',
-    operator: '#4caf50',
-    readonly: '#ff9800',
+  const palette: Record<UserRole, { fg: string; bg: string; border: string }> = {
+    admin: {
+      fg: 'var(--accent)',
+      bg: 'var(--accent-dim)',
+      border: 'var(--accent-glow)',
+    },
+    operator: {
+      fg: 'var(--text-secondary)',
+      bg: 'var(--bg-tertiary)',
+      border: 'var(--border)',
+    },
+    readonly: {
+      fg: 'var(--warning)',
+      bg: 'rgba(255, 143, 31, 0.10)',
+      border: 'rgba(255, 143, 31, 0.30)',
+    },
   }
-  const c = colors[role]
+  const c = palette[role]
   return (
     <span style={{
       display: 'inline-block',
       padding: '2px 8px',
-      borderRadius: '4px',
+      borderRadius: '999px',
       fontSize: '11px',
       fontWeight: 600,
-      background: c + '22',
-      color: c,
-      border: `1px solid ${c}55`,
+      background: c.bg,
+      color: c.fg,
+      border: `1px solid ${c.border}`,
     }}>
       {ROLE_LABELS[role]}
     </span>
@@ -290,7 +305,9 @@ export function TeamPanel() {
             {error && <div style={styles.errorBox}>{error}</div>}
             <div style={styles.btnRow}>
               <button type="button" style={styles.cancelBtn} onClick={back} disabled={busy}>Cancel</button>
-              <button type="submit" style={styles.primaryBtn} disabled={busy}>{busy ? 'Creating…' : 'Create user'}</button>
+              <button type="submit" style={styles.primaryBtn} disabled={busy}>
+                {busy ? <><Loader2 size={13} className="animate-spin" /> Creating…</> : 'Create user'}
+              </button>
             </div>
           </form>
         </div>
@@ -323,7 +340,9 @@ export function TeamPanel() {
             {error && <div style={styles.errorBox}>{error}</div>}
             <div style={styles.btnRow}>
               <button type="button" style={styles.cancelBtn} onClick={back} disabled={busy}>Cancel</button>
-              <button type="submit" style={styles.primaryBtn} disabled={busy}>{busy ? 'Saving…' : 'Save changes'}</button>
+              <button type="submit" style={styles.primaryBtn} disabled={busy}>
+                {busy ? <><Loader2 size={13} className="animate-spin" /> Saving…</> : 'Save changes'}
+              </button>
             </div>
           </form>
         </div>
@@ -354,7 +373,9 @@ export function TeamPanel() {
             {error && <div style={styles.errorBox}>{error}</div>}
             <div style={styles.btnRow}>
               <button type="button" style={styles.cancelBtn} onClick={back} disabled={busy}>Cancel</button>
-              <button type="submit" style={styles.primaryBtn} disabled={busy}>{busy ? 'Saving…' : 'Change password'}</button>
+              <button type="submit" style={styles.primaryBtn} disabled={busy}>
+                {busy ? <><Loader2 size={13} className="animate-spin" /> Saving…</> : 'Change password'}
+              </button>
             </div>
           </form>
         </div>
@@ -370,7 +391,9 @@ export function TeamPanel() {
           <span style={styles.title}>Team</span>
           <span style={styles.count}>{users.length} {users.length === 1 ? 'member' : 'members'}</span>
         </div>
-        <button style={styles.addBtn} onClick={openAdd}>+ Add member</button>
+        <button style={styles.addBtn} onClick={openAdd}>
+          <Plus size={13} /> Add member
+        </button>
       </div>
 
       <div style={styles.listWrap}>
@@ -419,7 +442,7 @@ export function TeamPanel() {
                     {u.serverAccess === '*'
                       ? 'All servers'
                       : u.serverAccess.length === 0
-                      ? <span style={{ color: '#f44336' }}>None</span>
+                      ? <span style={{ color: 'var(--error)' }}>None</span>
                       : `${u.serverAccess.length} server${u.serverAccess.length !== 1 ? 's' : ''}`}
                   </td>
                   <td style={{ ...styles.td, fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
@@ -427,10 +450,20 @@ export function TeamPanel() {
                   </td>
                   <td style={{ ...styles.td, textAlign: 'right' }}>
                     <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
-                      <button style={styles.actionBtn} onClick={() => openEdit(u)}>Edit</button>
-                      <button style={styles.actionBtn} onClick={() => openPassword(u)}>Password</button>
+                      <button style={styles.actionBtn} onClick={() => openEdit(u)} title="Edit role and access">
+                        <Pencil size={11} /> Edit
+                      </button>
+                      <button style={styles.actionBtn} onClick={() => openPassword(u)} title="Change password">
+                        <KeyRound size={11} /> Password
+                      </button>
                       {u.id !== currentUser?.id && (
-                        <button style={{ ...styles.actionBtn, color: '#f44336' }} onClick={() => handleDelete(u)}>Delete</button>
+                        <button
+                          style={{ ...styles.actionBtn, color: 'var(--error)', borderColor: 'rgba(205, 20, 20, 0.30)' }}
+                          onClick={() => handleDelete(u)}
+                          title="Delete user"
+                        >
+                          <Trash2 size={11} /> Delete
+                        </button>
                       )}
                     </div>
                   </td>
@@ -479,6 +512,9 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: '10px',
   },
   addBtn: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '6px',
     padding: '6px 14px',
     background: 'var(--accent)',
     color: '#fff',
@@ -549,13 +585,16 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'inline-block',
     fontSize: '10px',
     padding: '1px 6px',
-    background: 'var(--accent)22',
-    color: 'var(--accent)',
-    border: '1px solid var(--accent)55',
+    background: 'var(--accent-dim)',
+    color: 'var(--accent-hover)',
+    border: '1px solid var(--accent-glow)',
     borderRadius: '4px',
     fontWeight: 500,
   },
   actionBtn: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '4px',
     padding: '3px 10px',
     border: '1px solid var(--border)',
     borderRadius: 'var(--radius-sm)',
@@ -620,11 +659,11 @@ const styles: Record<string, React.CSSProperties> = {
   },
   errorBox: {
     fontSize: '12px',
-    color: '#f44336',
+    color: 'var(--error)',
     padding: '8px 12px',
-    background: 'rgba(244,67,54,0.1)',
+    background: 'rgba(205, 20, 20, 0.08)',
     borderRadius: 'var(--radius-sm)',
-    border: '1px solid rgba(244,67,54,0.25)',
+    border: '1px solid rgba(205, 20, 20, 0.20)',
   },
   btnRow: {
     display: 'flex',
@@ -642,6 +681,9 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
   },
   primaryBtn: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '6px',
     padding: '8px 20px',
     background: 'var(--accent)',
     color: '#fff',

@@ -5,6 +5,7 @@ import {
   ClipboardList,
   FileCode2,
   FolderClosed,
+  Loader2,
   LogOut,
   LucideIcon,
   Plus,
@@ -197,7 +198,9 @@ function CredentialModal({
 
           <div style={{ display: 'flex', gap: '8px', marginTop: '14px' }}>
             <button style={credStyles.connectBtn} type="submit" disabled={busy}>
-              {busy ? 'Saving…' : 'Save & Connect'}
+              {busy
+                ? <><Loader2 size={13} className="animate-spin" /> Saving…</>
+                : 'Save & Connect'}
             </button>
             <button style={credStyles.cancelBtn} type="button" onClick={onCancel} disabled={busy}>
               Cancel
@@ -295,7 +298,7 @@ export function Sidebar({ activeTab, onTabChange, onAddServer, onOpenSettings }:
       {/* Navigation */}
       <nav style={styles.nav}>
         <div style={styles.sectionLabel}>Navigation</div>
-        {tabs.filter(tab => tab.id !== 'audit' || true).map((tab) => {
+        {tabs.map((tab) => {
           const Icon = tab.icon
           return (
             <button
@@ -829,11 +832,11 @@ const credStyles: Record<string, React.CSSProperties> = {
   },
   error: {
     fontSize: '12px',
-    color: '#f44336',
+    color: 'var(--error)',
     padding: '6px 10px',
-    background: 'rgba(244,67,54,0.1)',
+    background: 'rgba(205, 20, 20, 0.08)',
     borderRadius: 'var(--radius-sm)',
-    border: '1px solid rgba(244,67,54,0.25)',
+    border: '1px solid rgba(205, 20, 20, 0.20)',
     marginTop: '4px',
   },
   connectBtn: {
@@ -846,6 +849,10 @@ const credStyles: Record<string, React.CSSProperties> = {
     fontSize: '13px',
     fontWeight: 600,
     cursor: 'pointer',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '6px',
   },
   cancelBtn: {
     flex: 1,

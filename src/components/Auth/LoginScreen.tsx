@@ -1,4 +1,5 @@
 import React, { FormEvent, useEffect, useRef, useState } from 'react'
+import { Loader2, LogIn, ShieldCheck, UserPlus } from 'lucide-react'
 import { useSessionStore } from '../../context/useSessionStore'
 import enputLogo from '../../assets/enput-logo.svg'
 
@@ -176,7 +177,9 @@ export function LoginScreen({ setupMode = false, onSetupDone }: LoginScreenProps
             <img src={enputLogo} alt="Enput" style={styles.logoMark} />
             <span style={styles.logoText}>Enput VPS</span>
           </div>
-          <div style={styles.spinner}>◌</div>
+          <div style={styles.spinner}>
+            <Loader2 size={28} className="animate-spin" />
+          </div>
           <p style={{ ...styles.sub, marginTop: '12px' }}>
             {silentChecking ? 'Restoring session…' : 'Checking configuration…'}
           </p>
@@ -228,7 +231,9 @@ export function LoginScreen({ setupMode = false, onSetupDone }: LoginScreenProps
             />
             {setupError && <div style={styles.error}>{setupError}</div>}
             <button style={styles.btn} type="submit" disabled={setupBusy}>
-              {setupBusy ? 'Creating account…' : 'Create admin account'}
+              {setupBusy
+                ? <><Loader2 size={14} className="animate-spin" /> Creating account…</>
+                : <><UserPlus size={14} /> Create admin account</>}
             </button>
           </form>
         </div>
@@ -273,10 +278,13 @@ export function LoginScreen({ setupMode = false, onSetupDone }: LoginScreenProps
             />
             {error && <div style={styles.error}>{error}</div>}
             <button style={styles.btn} type="submit" disabled={busy || !username.trim() || !password}>
-              {busy ? 'Signing in…' : 'Sign in'}
+              {busy
+                ? <><Loader2 size={14} className="animate-spin" /> Signing in…</>
+                : <><LogIn size={14} /> Sign in</>}
             </button>
           </form>
           <p style={styles.modeNote}>
+            <ShieldCheck size={11} style={{ display: 'inline-block', verticalAlign: '-2px', marginRight: '4px' }} />
             Authenticated via team server
           </p>
         </div>
@@ -314,7 +322,9 @@ export function LoginScreen({ setupMode = false, onSetupDone }: LoginScreenProps
           />
           {error && <div style={styles.error}>{error}</div>}
           <button style={styles.btn} type="submit" disabled={busy || !username.trim() || !password}>
-            {busy ? 'Signing in…' : 'Sign in'}
+            {busy
+              ? <><Loader2 size={14} className="animate-spin" /> Signing in…</>
+              : <><LogIn size={14} /> Sign in</>}
           </button>
         </form>
 
@@ -450,6 +460,10 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     cursor: 'pointer',
     opacity: 1,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
   },
   divider: {
     height: '1px',
@@ -524,10 +538,10 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: 0,
   },
   spinner: {
-    fontSize: '32px',
     color: 'var(--accent)',
-    animation: 'spin 1s linear infinite',
-    display: 'inline-block',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
     marginTop: '12px',
   },
 }

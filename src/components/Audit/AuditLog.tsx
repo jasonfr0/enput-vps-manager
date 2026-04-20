@@ -5,16 +5,27 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState } from '@/components/ui/error-state'
 import { Skeleton } from '@/components/ui/skeleton'
 
-const CATEGORY_COLORS: Record<string, string> = {
-  connection: '#6c63ff',
-  terminal: '#4caf50',
-  file: '#ff9800',
-  claude: '#00bcd4',
+// Token-based palette: each entry exposes a foreground colour plus pre-tinted
+// background and border surfaces. This avoids brittle hex+alpha string concat
+// (e.g. `color + '22'`) and keeps the badges aligned with the brand palette.
+type BadgeTone = { fg: string; bg: string; border: string }
+
+const NEUTRAL_TONE: BadgeTone = {
+  fg: 'var(--text-muted)',
+  bg: 'var(--bg-tertiary)',
+  border: 'var(--border)',
 }
 
-const OUTCOME_COLORS: Record<string, string> = {
-  success: '#4caf50',
-  failure: '#f44336',
+const CATEGORY_TONES: Record<string, BadgeTone> = {
+  connection: { fg: 'var(--accent)',  bg: 'var(--accent-dim)',           border: 'var(--accent-glow)' },
+  terminal:   { fg: 'var(--info)',    bg: 'rgba(26, 188, 254, 0.10)',    border: 'rgba(26, 188, 254, 0.30)' },
+  file:       { fg: 'var(--warning)', bg: 'rgba(255, 143, 31, 0.10)',    border: 'rgba(255, 143, 31, 0.30)' },
+  claude:     { fg: '#8B5CF6',        bg: 'rgba(139, 92, 246, 0.10)',    border: 'rgba(139, 92, 246, 0.30)' },
+}
+
+const OUTCOME_TONES: Record<string, BadgeTone> = {
+  success: { fg: 'var(--success)', bg: 'rgba(0, 181, 120, 0.10)', border: 'rgba(0, 181, 120, 0.25)' },
+  failure: { fg: 'var(--error)',   bg: 'rgba(205, 20, 20, 0.08)', border: 'rgba(205, 20, 20, 0.20)' },
 }
 
 const CATEGORIES = ['connection', 'terminal', 'file', 'claude'] as const
@@ -251,14 +262,14 @@ export function AuditLog() {
                       {formatTs(entry.timestamp)}
                     </td>
                     <td style={styles.td}>
-                      <span style={{
-                        ...styles.badge,
-                        background: (CATEGORY_COLORS[entry.category] ?? '#888') + '22',
-                        color: CATEGORY_COLORS[entry.category] ?? '#888',
-                        borderColor: (CATEGORY_COLORS[entry.category] ?? '#888') + '55',
-                      }}>
-                        {entry.category}
-                      </span>
+                      {(() => {
+                        const tone = CATEGORY_TONES[entry.category] ?? NEUTRAL_TONE
+                        return (
+                          <span style={{ ...styles.badge, background: tone.bg, color: tone.fg, borderColor: tone.border }}>
+                            {entry.category}
+                          </span>
+                        )
+                      })()}
                     </td>
                     <td style={{ ...styles.td, ...styles.mono, fontSize: '12px', color: 'var(--text-secondary)' }}>
                       {entry.action}
@@ -267,14 +278,14 @@ export function AuditLog() {
                       {entry.serverLabel}
                     </td>
                     <td style={styles.td}>
-                      <span style={{
-                        ...styles.badge,
-                        background: (OUTCOME_COLORS[entry.outcome] ?? '#888') + '22',
-                        color: OUTCOME_COLORS[entry.outcome] ?? '#888',
-                        borderColor: (OUTCOME_COLORS[entry.outcome] ?? '#888') + '55',
-                      }}>
-                        {entry.outcome}
-                      </span>
+                      {(() => {
+                        const tone = OUTCOME_TONES[entry.outcome] ?? NEUTRAL_TONE
+                        return (
+                          <span style={{ ...styles.badge, background: tone.bg, color: tone.fg, borderColor: tone.border }}>
+                            {entry.outcome}
+                          </span>
+                        )
+                      })()}
                     </td>
                     <td style={{ ...styles.td, maxWidth: '0', width: '100%' }}>
                       <span
@@ -364,8 +375,8 @@ const styles: Record<string, React.CSSProperties> = {
     flexShrink: 0,
   },
   btnDanger: {
-    borderColor: 'rgba(244,67,54,0.4)',
-    color: '#f44336',
+    borderColor: 'rgba(205, 20, 20, 0.30)',
+    color: 'var(--error)',
   },
   confirmRow: {
     display: 'flex',
@@ -374,7 +385,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   confirmText: {
     fontSize: '12px',
-    color: '#f44336',
+    color: 'var(--error)',
   },
   filters: {
     display: 'flex',
@@ -424,7 +435,7 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'var(--text-primary)',
     fontSize: '12px',
     outline: 'none',
-    colorScheme: 'dark',
+    colorScheme: 'light',
   },
   clearFilters: {
     display: 'inline-flex',
@@ -484,12 +495,13 @@ const styles: Record<string, React.CSSProperties> = {
   },
   badge: {
     display: 'inline-block',
-    padding: '2px 7px',
-    borderRadius: '4px',
+    padding: '2px 8px',
+    borderRadius: '999px',
     fontSize: '11px',
     fontWeight: 500,
     border: '1px solid',
     whiteSpace: 'nowrap' as const,
+    textTransform: 'capitalize' as const,
   },
 }
 

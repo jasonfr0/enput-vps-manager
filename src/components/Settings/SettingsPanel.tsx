@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { Check, Loader2, RotateCcw, X as XIcon } from 'lucide-react'
 import { useSettingsStore, AppSettings } from '../../context/useSettingsStore'
 import { useUpdateStore } from '../../context/useUpdateStore'
 import { useSessionStore } from '../../context/useSessionStore'
@@ -182,6 +183,7 @@ export function SettingsPanel() {
             }
           }}
         >
+          <RotateCcw size={11} />
           Reset to defaults
         </button>
       </div>
@@ -390,54 +392,59 @@ function AuthServerSection() {
     setUrl(''); setSaved(''); setStatus('idle'); setMessage('')
   }
 
+  const isOk = status === 'ok'
+
   return (
-    <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-      <p style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+    <div style={s.authBody}>
+      <p style={s.authBlurb}>
         Connect to a shared auth server so your whole team can log in from their own machines.
         Leave blank to use local accounts only.
       </p>
-      <div style={{ display: 'flex', gap: '8px' }}>
+      <div style={s.authRow}>
         <input
-          style={{ flex: 1, padding: '7px 10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', fontFamily: 'var(--font-mono)' }}
+          style={s.authInput}
           placeholder="https://vpsadmin.enputauto.com"
           value={url}
           onChange={e => setUrl(e.target.value)}
         />
         <button
-          style={{ padding: '6px 12px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', background: 'transparent', color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer' }}
+          style={s.authBtn}
           onClick={handleSave}
           disabled={url.trim() === saved}
         >
           Save
         </button>
         <button
-          style={{ padding: '6px 12px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', background: 'transparent', color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer' }}
+          style={s.authBtn}
           onClick={handleTest}
           disabled={!url.trim() || status === 'testing'}
         >
+          {status === 'testing' ? <Loader2 size={11} className="animate-spin" /> : null}
           {status === 'testing' ? 'Testing…' : 'Test'}
         </button>
         {saved && (
           <button
-            style={{ padding: '6px 12px', border: '1px solid rgba(244,67,54,.4)', borderRadius: 'var(--radius-sm)', background: 'transparent', color: '#f44336', fontSize: '12px', cursor: 'pointer' }}
+            style={s.authClearBtn}
             onClick={handleClear}
           >
+            <XIcon size={11} />
             Clear
           </button>
         )}
       </div>
       {message && (
         <div style={{
-          fontSize: '12px', padding: '7px 10px', borderRadius: 'var(--radius-sm)',
-          background: status === 'ok' ? 'rgba(76,175,80,.1)' : 'rgba(244,67,54,.1)',
-          color:      status === 'ok' ? '#4caf50'           : '#f44336',
-          border: `1px solid ${status === 'ok' ? 'rgba(76,175,80,.3)' : 'rgba(244,67,54,.3)'}`,
+          ...s.authStatus,
+          background: isOk ? 'rgba(0, 181, 120, 0.10)' : 'rgba(205, 20, 20, 0.08)',
+          color:      isOk ? 'var(--success)'         : 'var(--error)',
+          border: `1px solid ${isOk ? 'rgba(0, 181, 120, 0.25)' : 'rgba(205, 20, 20, 0.20)'}`,
         }}>
-          {message}
+          {isOk ? <Check size={12} /> : null}
+          <span>{message}</span>
         </div>
       )}
       {saved && (
-        <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+        <p style={s.authActiveNote}>
           Active: <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>{saved}</span>
           &ensp;— Restart the app for auth server changes to take full effect.
         </p>
@@ -479,6 +486,9 @@ const s: Record<string, React.CSSProperties> = {
     fontSize: '11px',
     cursor: 'pointer',
     flexShrink: 0,
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '6px',
   },
   // Full-width scrollable area — content is centered inside
   scrollArea: {
@@ -654,5 +664,72 @@ const s: Record<string, React.CSSProperties> = {
   mutedText: {
     fontSize: '12px',
     color: 'var(--text-muted)',
+  },
+  // Auth server section
+  authBody: {
+    padding: '12px 16px',
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '12px',
+  },
+  authBlurb: {
+    fontSize: '12px',
+    color: 'var(--text-muted)',
+    lineHeight: 1.5,
+    margin: 0,
+  },
+  authRow: {
+    display: 'flex',
+    gap: '8px',
+  },
+  authInput: {
+    flex: 1,
+    padding: '7px 10px',
+    background: 'var(--bg-tertiary)',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--radius-sm)',
+    color: 'var(--text-primary)',
+    fontSize: '13px',
+    outline: 'none',
+    fontFamily: 'var(--font-mono)',
+  },
+  authBtn: {
+    padding: '6px 12px',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--radius-sm)',
+    background: 'transparent',
+    color: 'var(--text-secondary)',
+    fontSize: '12px',
+    cursor: 'pointer',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '6px',
+    whiteSpace: 'nowrap' as const,
+  },
+  authClearBtn: {
+    padding: '6px 12px',
+    border: '1px solid rgba(205, 20, 20, 0.30)',
+    borderRadius: 'var(--radius-sm)',
+    background: 'transparent',
+    color: 'var(--error)',
+    fontSize: '12px',
+    cursor: 'pointer',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '6px',
+    whiteSpace: 'nowrap' as const,
+  },
+  authStatus: {
+    fontSize: '12px',
+    padding: '7px 10px',
+    borderRadius: 'var(--radius-sm)',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+  },
+  authActiveNote: {
+    fontSize: '11px',
+    color: 'var(--text-muted)',
+    margin: 0,
   },
 }
