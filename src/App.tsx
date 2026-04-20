@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Lock } from 'lucide-react'
 import { Sidebar } from './components/Layout/Sidebar'
 import { Header } from './components/Layout/Header'
-import { TerminalView } from './components/Terminal/TerminalView'
+import { TerminalTabs } from './components/Terminal/TerminalTabs'
 import { FileBrowser } from './components/FileManager/FileBrowser'
 import { CodeEditor } from './components/Editor/CodeEditor'
 import { ChatInterface } from './components/Chat/ChatInterface'
@@ -345,9 +345,9 @@ export default function App() {
               /* position:relative so the absolute panes resolve inset:0 correctly */
               <div style={{ position: 'relative', flex: 1, overflow: 'hidden' }}>
 
-                {/* Terminal — PTY session must survive tab switches */}
+                {/* Terminal — PTY sessions must survive tab switches */}
                 <div style={pane('terminal')}>
-                  <TerminalView connId={activeConnId!} readOnly={isRO} isActive={activeTab === 'terminal'} />
+                  <TerminalTabs connId={activeConnId!} readOnly={isRO} isActive={activeTab === 'terminal'} />
                 </div>
 
                 {/* Claude Code — PTY session must survive tab switches */}
