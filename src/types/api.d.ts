@@ -25,9 +25,11 @@ export interface ElectronAPI {
     onUpdate: (callback: (data: any) => void) => () => void
   }
   claude: {
-    chat: (connId: string, messages: any[]) => Promise<any>
+    chat: (connId: string, messages: any[], userId?: string) => Promise<any>
     execute: (connId: string, command: string) => Promise<any>
     onStream: (callback: (data: any) => void) => () => void
+    getApiKey: (userId?: string) => Promise<boolean>
+    setApiKey: (key: string, userId?: string) => Promise<void>
   }
   servers: {
     list: () => Promise<any[]>

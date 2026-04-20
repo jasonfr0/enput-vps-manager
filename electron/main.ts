@@ -33,12 +33,7 @@ const authServerManager = new AuthServerManager()
 const savedAuthUrl = credentialManager.getSetting<string>('auth_server_url', '')
 if (savedAuthUrl) authServerManager.setBaseUrl(savedAuthUrl)
 
-// Load saved API key
-const savedApiKey = credentialManager.getSetting<string | null>('claude_api_key', null)
-if (savedApiKey) {
-  claudeManager.setApiKey(savedApiKey)
-  log.info('Claude API key loaded from settings')
-}
+// API keys are now stored per-user (claude_api_key_<userId>) and loaded on demand
 
 let mainWindow: BrowserWindow | null = null
 

@@ -112,13 +112,13 @@ contextBridge.exposeInMainWorld('api', {
 
   // Claude integration
   claude: {
-    chat: (connId: string, messages: any[]) =>
-      ipcRenderer.invoke(IPC_CHANNELS.CLAUDE_CHAT, { connId, messages }),
+    chat: (connId: string, messages: any[], userId?: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.CLAUDE_CHAT, { connId, messages, userId }),
     execute: (connId: string, command: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.CLAUDE_EXECUTE, { connId, command }),
-    setApiKey: (key: string) =>
-      ipcRenderer.invoke('claude:setApiKey', { key }),
-    getApiKey: () => ipcRenderer.invoke('claude:getApiKey'),
+    setApiKey: (key: string, userId?: string) =>
+      ipcRenderer.invoke('claude:setApiKey', { key, userId }),
+    getApiKey: (userId?: string) => ipcRenderer.invoke('claude:getApiKey', { userId }),
     onStream: (callback: (data: any) => void) => {
       const handler = (_: any, payload: any) => callback(payload)
       ipcRenderer.on(IPC_CHANNELS.CLAUDE_CHAT_STREAM, handler)

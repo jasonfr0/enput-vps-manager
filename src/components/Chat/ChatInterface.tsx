@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useChatStore } from '../../context/useChatStore'
+import { useSessionStore } from '../../context/useSessionStore'
 
 interface ChatInterfaceProps {
   connId: string
@@ -18,11 +19,13 @@ export function ChatInterface({ connId }: ChatInterfaceProps) {
     addMessage,
     setLoading,
   } = useChatStore()
+  const { currentUser } = useSessionStore()
+  const userId = currentUser?.id
 
-  // Check if API key is configured on mount
+  // Check if API key is configured on mount (or when user changes)
   useEffect(() => {
-    window.api.claude.getApiKey().then((has: boolean) => setHasApiKey(has))
-  }, [])
+    window.api.claude.getApiKey(userId).then((has: boolean) => setHasApiKey(has))
+  }, [userId])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -30,7 +33,7 @@ export function ChatInterface({ connId }: ChatInterfaceProps) {
 
   const handleSetApiKey = async () => {
     if (!apiKeyInput.trim()) return
-    await window.api.claude.setApiKey(apiKeyInput.trim())
+    await window.api.claude.setApiKey(apiKeyInput.trim(), userId)
     setHasApiKey(true)
     setShowApiKeyForm(false)
     setApiKeyInput('')
@@ -53,7 +56,7 @@ export function ChatInterface({ connId }: ChatInterfaceProps) {
       const response = await window.api.claude.chat(connId, [
         ...messages.map((m) => ({ role: m.role, content: m.content })),
         { role: 'user', content: input.trim() },
-      ])
+      ], userId)
 
       const assistantMsg = {
         id: `msg_${Date.now()}`,

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useSettingsStore, AppSettings } from '../../context/useSettingsStore'
 import { useUpdateStore } from '../../context/useUpdateStore'
+import { useSessionStore } from '../../context/useSessionStore'
 import { SSHKeyPanel } from '../SSHKeys/SSHKeyPanel'
 
 const TAB_OPTIONS = [
@@ -126,6 +127,8 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 export function SettingsPanel() {
   const settings = useSettingsStore()
   const { update, reset } = settings
+  const { currentUser } = useSessionStore()
+  const userId = currentUser?.id
 
   // API key state (managed separately via IPC)
   const [hasApiKey, setHasApiKey] = useState<boolean | null>(null)
@@ -135,18 +138,18 @@ export function SettingsPanel() {
 
   useEffect(() => {
     try {
-      window.api.claude.getApiKey()
+      window.api.claude.getApiKey(userId)
         .then((has: boolean) => setHasApiKey(has))
         .catch(() => setHasApiKey(false))
     } catch {
       setHasApiKey(false)
     }
-  }, [])
+  }, [userId])
 
   const handleSaveApiKey = async () => {
     if (!apiKeyInput.trim()) return
     try {
-      await window.api.claude.setApiKey(apiKeyInput.trim())
+      await window.api.claude.setApiKey(apiKeyInput.trim(), userId)
       setHasApiKey(true)
       setShowApiKeyInput(false)
       setApiKeyInput('')

@@ -261,24 +261,28 @@ export function registerIpcHandlers(
 
   ipcMain.handle(
     IPC_CHANNELS.CLAUDE_CHAT,
-    async (_, { connId, messages }) => {
+    async (_, { connId, messages, userId }) => {
+      // Load the requesting user's own API key before chatting
+      if (userId) {
+        const saved = credentialManager.getSetting(`claude_api_key_${userId}`, null)
+        claudeManager.setApiKey(saved ?? '')
+      }
       return claudeManager.chat(messages)
     }
   )
 
-  ipcMain.handle('claude:setApiKey', async (_, { key }) => {
+  ipcMain.handle('claude:setApiKey', async (_, { key, userId }) => {
+    const storageKey = userId ? `claude_api_key_${userId}` : 'claude_api_key'
     claudeManager.setApiKey(key)
-    // Persist the key in settings
-    credentialManager.setSetting('claude_api_key', key)
+    credentialManager.setSetting(storageKey, key)
   })
 
-  ipcMain.handle('claude:getApiKey', async () => {
-    // Try to load from settings if not already set
-    if (!claudeManager.getApiKey()) {
-      const saved = credentialManager.getSetting('claude_api_key', null)
-      if (saved) claudeManager.setApiKey(saved)
-    }
-    return claudeManager.getApiKey() ? true : false
+  ipcMain.handle('claude:getApiKey', async (_, { userId } = {}) => {
+    const storageKey = userId ? `claude_api_key_${userId}` : 'claude_api_key'
+    const saved = credentialManager.getSetting(storageKey, null)
+    if (saved) claudeManager.setApiKey(saved)
+    else claudeManager.setApiKey('')
+    return !!saved
   })
 
   ipcMain.handle(
