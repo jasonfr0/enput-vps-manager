@@ -1,6 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Download, RefreshCw, Trash2, X } from 'lucide-react'
+import { ClipboardList, Download, RefreshCw, Trash2, X } from 'lucide-react'
 import { AuditEntry } from '../../types/api'
+import { EmptyState } from '@/components/ui/empty-state'
+import { ErrorState } from '@/components/ui/error-state'
+import { Skeleton } from '@/components/ui/skeleton'
 
 const CATEGORY_COLORS: Record<string, string> = {
   connection: '#6c63ff',
@@ -31,6 +34,7 @@ function formatTs(iso: string): string {
 export function AuditLog() {
   const [entries, setEntries]       = useState<AuditEntry[]>([])
   const [loading, setLoading]       = useState(false)
+  const [error, setError]           = useState<string | null>(null)
   const [filterCategory, setFilterCategory] = useState('')
   const [filterSearch, setFilterSearch]     = useState('')
   const [filterSince, setFilterSince]       = useState('')
@@ -41,6 +45,7 @@ export function AuditLog() {
 
   const load = useCallback(async (search?: string) => {
     setLoading(true)
+    setError(null)
     try {
       const filter: any = {}
       if (filterCategory) filter.category = filterCategory
@@ -56,6 +61,7 @@ export function AuditLog() {
       setEntries(data)
     } catch (err: any) {
       console.error('[AuditLog] load error:', err)
+      setError(err?.message ?? 'Failed to load audit entries.')
     } finally {
       setLoading(false)
     }
@@ -107,6 +113,8 @@ export function AuditLog() {
       return next
     })
   }
+
+  const hasActiveFilters = Boolean(filterCategory || filterSearch || filterSince || filterUntil)
 
   return (
     <div style={styles.root}>
@@ -195,10 +203,28 @@ export function AuditLog() {
 
       {/* Table */}
       <div style={styles.tableWrap}>
-        {loading ? (
-          <div style={styles.empty}>Loading…</div>
+        {loading && entries.length === 0 ? (
+          <AuditLogSkeleton />
+        ) : error ? (
+          <ErrorState
+            title="Couldn't load audit log"
+            description={error}
+            onRetry={() => load()}
+          />
         ) : entries.length === 0 ? (
-          <div style={styles.empty}>No audit entries found.</div>
+          hasActiveFilters ? (
+            <EmptyState
+              icon={ClipboardList}
+              title="No entries match your filters"
+              description="Try broadening the search or clearing filters."
+            />
+          ) : (
+            <EmptyState
+              icon={ClipboardList}
+              title="No audit entries yet"
+              description="Activity will appear here once servers are used."
+            />
+          )
         ) : (
           <table style={styles.table}>
             <thead>
@@ -465,4 +491,23 @@ const styles: Record<string, React.CSSProperties> = {
     border: '1px solid',
     whiteSpace: 'nowrap' as const,
   },
+}
+
+// Skeleton rows roughly shaped like the audit table: timestamp, category badge,
+// action, server, outcome badge, details. Shown on initial load only.
+function AuditLogSkeleton() {
+  return (
+    <div className="flex flex-col gap-2 p-3">
+      {Array.from({ length: 8 }).map((_, i) => (
+        <div key={i} className="flex items-center gap-3">
+          <Skeleton className="h-3 w-[120px]" />
+          <Skeleton className="h-4 w-[72px] rounded" />
+          <Skeleton className="h-3 w-[70px]" />
+          <Skeleton className="h-3 w-[110px]" />
+          <Skeleton className="h-4 w-[56px] rounded" />
+          <Skeleton className="h-3 flex-1" />
+        </div>
+      ))}
+    </div>
+  )
 }

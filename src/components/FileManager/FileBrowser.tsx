@@ -26,6 +26,9 @@ import {
 } from 'lucide-react'
 import { useFileStore } from '../../context/useFileStore'
 import { confirmDialog } from '../../context/useConfirmStore'
+import { EmptyState } from '@/components/ui/empty-state'
+import { ErrorState } from '@/components/ui/error-state'
+import { Skeleton } from '@/components/ui/skeleton'
 
 interface FileBrowserProps {
   connId: string
@@ -377,7 +380,9 @@ export function FileBrowser({ connId, onOpenFile }: FileBrowserProps) {
       </div>
 
       {/* ── Error banner ─────────────────────────────────────── */}
-      {error && (
+      {/* Only show the banner when we have stale files from a previous dir.
+          If the list is empty + errored, the ErrorState below takes over. */}
+      {error && files.length > 0 && (
         <div style={s.errorBanner}>
           <span>{error}</span>
           <button style={s.dismissBtn} onClick={() => setError(null)} title="Dismiss">
@@ -427,13 +432,25 @@ export function FileBrowser({ connId, onOpenFile }: FileBrowserProps) {
           </div>
         )}
 
-        {/* Loading state */}
-        {isLoading ? (
-          <div style={s.emptyMsg}>Loading…</div>
+        {/* Loading / empty / error states */}
+        {isLoading && files.length === 0 ? (
+          <FileBrowserSkeleton />
+        ) : error && files.length === 0 ? (
+          <ErrorState
+            title="Couldn't load directory"
+            description={error}
+            onRetry={() => loadDirectory(currentPath)}
+          />
         ) : displayFiles.length === 0 && !newItemMode ? (
-          <div style={s.emptyMsg}>
-            {showHidden ? 'Empty directory' : 'Empty directory (or all files are hidden)'}
-          </div>
+          <EmptyState
+            icon={Folder}
+            title={showHidden ? 'Empty directory' : 'Nothing here yet'}
+            description={showHidden
+              ? 'This folder has no files.'
+              : hiddenCount > 0
+                ? `${hiddenCount} hidden ${hiddenCount === 1 ? 'item' : 'items'}. Toggle "Show hidden" to view.`
+                : 'This folder has no files. Use the + button to create one.'}
+          />
         ) : (
 
           displayFiles.map((entry) => {
@@ -655,7 +672,7 @@ const s: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     padding: '6px 10px',
     borderBottom: '1px solid var(--border)',
-    background: 'rgba(100, 108, 255, 0.07)',
+    background: 'var(--accent-dim)',
     gap: 6,
   },
   fileRow: {
@@ -818,4 +835,21 @@ const s: Record<string, React.CSSProperties> = {
     fontSize: '10px',
     color: 'var(--text-muted)',
   },
+}
+
+// Skeleton rows matching the file list: icon + name, size, modified, actions.
+function FileBrowserSkeleton() {
+  return (
+    <div className="flex flex-col gap-1 px-3 py-2">
+      {Array.from({ length: 10 }).map((_, i) => (
+        <div key={i} className="flex items-center gap-3 py-1">
+          <Skeleton className="size-4 rounded" />
+          <Skeleton className="h-3 flex-[3] max-w-[320px]" />
+          <Skeleton className="h-3 flex-1 max-w-[72px]" />
+          <Skeleton className="h-3 flex-[2] max-w-[140px]" />
+          <Skeleton className="h-3 flex-[1.5] max-w-[96px]" />
+        </div>
+      ))}
+    </div>
+  )
 }

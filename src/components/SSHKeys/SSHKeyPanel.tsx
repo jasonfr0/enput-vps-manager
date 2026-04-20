@@ -1,8 +1,10 @@
 import React, { useEffect, useState, useCallback } from 'react'
-import { RefreshCw, X } from 'lucide-react'
+import { KeyRound, Plug, RefreshCw, ShieldCheck, X } from 'lucide-react'
 import { useConnectionStore } from '../../context/useConnectionStore'
 import { notify } from '../../context/useNotificationStore'
 import { confirmDialog } from '../../context/useConfirmStore'
+import { EmptyState } from '@/components/ui/empty-state'
+import { Skeleton } from '@/components/ui/skeleton'
 
 interface SSHKeyInfo {
   name: string; privatePath: string; publicPath: string
@@ -291,9 +293,14 @@ export function SSHKeyPanel() {
       </div>
 
       {loadingLocal ? (
-        <div style={s.placeholder}>Loading…</div>
+        <SSHKeyRowsSkeleton />
       ) : localKeys.length === 0 ? (
-        <div style={s.placeholder}>No SSH key pairs found in ~/.ssh/</div>
+        <EmptyState
+          size="sm"
+          icon={KeyRound}
+          title="No SSH keys yet"
+          description="Generate a key pair below to get started."
+        />
       ) : (
         localKeys.map(k => (
           <LocalKeyRow
@@ -321,11 +328,21 @@ export function SSHKeyPanel() {
       </div>
 
       {!connected ? (
-        <div style={s.placeholder}>Connect to a server to manage authorized keys</div>
+        <EmptyState
+          size="sm"
+          icon={Plug}
+          title="Not connected"
+          description="Connect to a server to manage its authorized keys."
+        />
       ) : loadingRemote ? (
-        <div style={s.placeholder}>Loading…</div>
+        <SSHKeyRowsSkeleton />
       ) : authorizedKeys.length === 0 ? (
-        <div style={s.placeholder}>No authorized keys found on this server</div>
+        <EmptyState
+          size="sm"
+          icon={ShieldCheck}
+          title="No authorized keys on this server"
+          description="Authorize a local public key to grant SSH access."
+        />
       ) : (
         <div style={s.authTable}>
           <div style={s.authHeader}>
@@ -598,4 +615,20 @@ const s: Record<string, React.CSSProperties> = {
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap' as const,
   },
+}
+
+// Skeleton rows for both local-keys and authorized-keys lists — shape matches
+// type badge, key body, comment. Shown while the first fetch is in flight.
+function SSHKeyRowsSkeleton() {
+  return (
+    <div className="flex flex-col gap-2 p-3">
+      {Array.from({ length: 3 }).map((_, i) => (
+        <div key={i} className="flex items-center gap-3">
+          <Skeleton className="h-4 w-[56px] rounded" />
+          <Skeleton className="h-3 flex-1" />
+          <Skeleton className="h-3 w-[90px]" />
+        </div>
+      ))}
+    </div>
+  )
 }

@@ -39,7 +39,7 @@ export function UpdateBanner() {
 
   if (status === 'available') {
     return (
-      <div style={{ ...s.banner, background: 'rgba(108,99,255,0.1)', borderColor: 'rgba(108,99,255,0.35)' }}>
+      <div style={{ ...s.banner, background: 'var(--accent-dim)', borderColor: 'var(--accent-glow)' }}>
         <span style={s.icon}><ArrowUpCircle size={14} /></span>
         <span style={s.text}>
           Version <strong style={{ color: 'var(--text-primary)' }}>{version}</strong> is available.

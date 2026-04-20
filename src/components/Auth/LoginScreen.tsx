@@ -1,6 +1,6 @@
 import React, { FormEvent, useEffect, useRef, useState } from 'react'
-import { Zap } from 'lucide-react'
 import { useSessionStore } from '../../context/useSessionStore'
+import enputLogo from '../../assets/enput-logo.svg'
 
 interface LoginScreenProps {
   /** If true, show the first-run admin account creation form instead */
@@ -173,7 +173,7 @@ export function LoginScreen({ setupMode = false, onSetupDone }: LoginScreenProps
       <div style={styles.overlay}>
         <div style={{ ...styles.card, textAlign: 'center' }}>
           <div style={styles.logoRow}>
-            <span style={styles.logoIcon}><Zap size={24} strokeWidth={2.5} /></span>
+            <img src={enputLogo} alt="Enput" style={styles.logoMark} />
             <span style={styles.logoText}>Enput VPS</span>
           </div>
           <div style={styles.spinner}>◌</div>
@@ -191,7 +191,7 @@ export function LoginScreen({ setupMode = false, onSetupDone }: LoginScreenProps
       <div style={styles.overlay}>
         <div style={styles.card}>
           <div style={styles.logoRow}>
-            <span style={styles.logoIcon}><Zap size={24} strokeWidth={2.5} /></span>
+            <img src={enputLogo} alt="Enput" style={styles.logoMark} />
             <span style={styles.logoText}>Enput VPS</span>
           </div>
           <h1 style={styles.heading}>Welcome — Set up your admin account</h1>
@@ -242,7 +242,7 @@ export function LoginScreen({ setupMode = false, onSetupDone }: LoginScreenProps
       <div style={styles.overlay}>
         <div style={styles.card}>
           <div style={styles.logoRow}>
-            <span style={styles.logoIcon}><Zap size={24} strokeWidth={2.5} /></span>
+            <img src={enputLogo} alt="Enput" style={styles.logoMark} />
             <span style={styles.logoText}>Enput VPS</span>
           </div>
           <h1 style={styles.heading}>Sign in</h1>
@@ -289,7 +289,7 @@ export function LoginScreen({ setupMode = false, onSetupDone }: LoginScreenProps
     <div style={styles.overlay}>
       <div style={styles.card}>
         <div style={styles.logoRow}>
-          <span style={styles.logoIcon}><Zap size={24} strokeWidth={2.5} /></span>
+          <img src={enputLogo} alt="Enput" style={styles.logoMark} />
           <span style={styles.logoText}>Enput VPS</span>
         </div>
         <h1 style={styles.heading}>Sign in</h1>
@@ -368,23 +368,25 @@ const styles: Record<string, React.CSSProperties> = {
   card: {
     width: '360px',
     background: 'var(--bg-secondary)',
-    borderRadius: '12px',
+    borderRadius: 'var(--radius)',
     border: '1px solid var(--border)',
     padding: '36px 32px 28px',
-    boxShadow: '0 16px 48px rgba(0,0,0,0.4)',
+    /* Light-theme card shadow — softer and brand-tinted to suggest the
+       Enput green without the overlay dominating. */
+    boxShadow: '0 16px 48px rgba(64, 155, 98, 0.12), 0 2px 6px rgba(0, 0, 0, 0.06)',
   },
   logoRow: {
     display: 'flex',
     alignItems: 'center',
-    gap: '8px',
+    gap: '10px',
     marginBottom: '20px',
   },
-  logoIcon: {
-    color: 'var(--accent)',
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  logoMark: {
+    width: 32,
+    height: 32,
+    display: 'block',
+    flexShrink: 0,
+  } as React.CSSProperties,
   logoText: {
     fontSize: '16px',
     fontWeight: 700,
@@ -430,11 +432,11 @@ const styles: Record<string, React.CSSProperties> = {
   },
   error: {
     fontSize: '12px',
-    color: '#f44336',
+    color: 'var(--error)',
     padding: '6px 10px',
-    background: 'rgba(244,67,54,0.1)',
+    background: 'rgba(205, 20, 20, 0.08)',
     borderRadius: 'var(--radius-sm)',
-    border: '1px solid rgba(244,67,54,0.25)',
+    border: '1px solid rgba(205, 20, 20, 0.20)',
   },
   btn: {
     flex: 1,
@@ -491,8 +493,9 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '6px',
     marginBottom: '16px',
     padding: '5px 10px',
-    background: 'rgba(99,102,241,0.1)',
-    border: '1px solid rgba(99,102,241,0.25)',
+    /* Brand-tinted pill — signals the team auth-server connection. */
+    background: 'var(--accent-dim)',
+    border: '1px solid var(--accent-glow)',
     borderRadius: '20px',
     width: 'fit-content',
     maxWidth: '100%',
@@ -502,13 +505,13 @@ const styles: Record<string, React.CSSProperties> = {
     width: '6px',
     height: '6px',
     borderRadius: '50%',
-    background: '#6366f1',
+    background: 'var(--accent)',
     flexShrink: 0,
   },
   serverBadgeText: {
     fontSize: '11px',
-    color: '#818cf8',
-    fontFamily: 'monospace',
+    color: 'var(--accent-hover)',
+    fontFamily: 'var(--font-mono)',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',

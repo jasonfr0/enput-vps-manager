@@ -1,4 +1,4 @@
-import React, { FormEvent, useState } from 'react'
+import React, { FormEvent, useEffect, useState } from 'react'
 import {
   Activity,
   Bot,
@@ -8,13 +8,16 @@ import {
   LogOut,
   LucideIcon,
   Plus,
+  ServerOff,
   Settings,
   Sparkles,
   Terminal as TerminalIcon,
   Users,
   X,
-  Zap,
 } from 'lucide-react'
+import enputLogo from '../../assets/enput-logo.svg'
+import { EmptyState } from '@/components/ui/empty-state'
+import { Button } from '@/components/ui/button'
 import { ActiveTab } from '../../App'
 import { useConnectionStore } from '../../context/useConnectionStore'
 import { useSessionStore, ROLE_LABELS } from '../../context/useSessionStore'
@@ -65,6 +68,19 @@ function CredentialModal({
   const [passphrase, setPassphrase]   = useState('')
   const [busy, setBusy]               = useState(false)
   const [error, setError]             = useState('')
+
+  // Escape closes the modal — but only if we aren't mid-save, to avoid the user
+  // accidentally cancelling a credential write that's already partially through.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !busy) {
+        e.preventDefault()
+        onCancel()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onCancel, busy])
 
   const pickKeyFile = async () => {
     const result = await window.api.dialog.openFile({
@@ -270,11 +286,9 @@ export function Sidebar({ activeTab, onTabChange, onAddServer, onOpenSettings }:
           }}
         />
       )}
-      {/* Logo */}
+      {/* Logo — Enput brand mark + product wordmark */}
       <div style={styles.logo}>
-        <span style={styles.logoIcon}>
-          <Zap size={16} strokeWidth={2.5} />
-        </span>
+        <img src={enputLogo} alt="Enput" style={styles.logoMark} />
         <span style={styles.logoText}>Enput VPS</span>
       </div>
 
@@ -320,7 +334,18 @@ export function Sidebar({ activeTab, onTabChange, onAddServer, onOpenSettings }:
 
         <div style={styles.serverList}>
           {servers.filter(s => canAccessServer(s.id)).length === 0 && (
-            <div style={styles.emptyServers}>No servers added yet</div>
+            <EmptyState
+              size="sm"
+              icon={ServerOff}
+              title="No servers yet"
+              description="Add your first one to get started."
+              action={
+                <Button size="sm" onClick={onAddServer}>
+                  <Plus />
+                  Add server
+                </Button>
+              }
+            />
           )}
           {servers.filter(s => canAccessServer(s.id)).map((server) => {
             const isActive = activeServerId === server.id
@@ -464,17 +489,19 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '14px 16px',
     borderBottom: '1px solid var(--border)',
   },
-  logoIcon: {
-    color: 'var(--accent)',
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  logoMark: {
+    width: 28,
+    height: 28,
+    display: 'block',
+    flexShrink: 0,
+    // The source SVG has a white square background; on the white sidebar
+    // surface the bg disappears and only the green/black "E" mark shows.
+  } as React.CSSProperties,
   logoText: {
-    fontSize: '15px',
+    fontSize: '16px',
     fontWeight: 700,
+    letterSpacing: '-0.01em',
     color: 'var(--text-primary)',
-    letterSpacing: '-0.3px',
   },
   nav: {
     padding: '10px 8px',
@@ -765,7 +792,8 @@ const credStyles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
   },
   toggleActive: {
-    background: 'rgba(99,102,241,0.15)',
+    // Brand accent tint — uses the same token as nav-item active for consistency.
+    background: 'var(--accent-dim)',
     borderColor: 'var(--accent)',
     color: 'var(--accent)',
   },

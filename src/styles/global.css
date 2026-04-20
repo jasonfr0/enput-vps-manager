@@ -1,53 +1,157 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+/* shadcn/ui dark mode variant — kept available for future theme toggle work. */
+@custom-variant dark (&:is(.dark *));
+
+/* ───────────────────────────────────────────────────────────────
+   Design tokens — Enput brand (light theme)
+   ───────────────────────────────────────────────────────────────
+   The variable names below are unchanged for backwards compatibility
+   (every component uses `var(--bg-primary)`, `var(--accent)`, etc.).
+   Only the values flip. This keeps the chrome of the app — sidebar,
+   header, panels, settings — in Enput's light palette while terminal/
+   Monaco surfaces remain dark via their own component-local theming.
+
+   Mapping rationale:
+     bg-primary    = page background  (Enput #F0F2F5)
+     bg-secondary  = panel surface    (white)
+     bg-tertiary   = subtle fills     (Enput #F5F5F5 icon-bg / form bg)
+     bg-hover      = hover surface    (Enput #EDEDED)
+     bg-active     = selected fill    (light green tint)
+     accent        = brand green      (#409B62)
+   ─────────────────────────────────────────────────────────────── */
 :root {
   /* Backgrounds */
-  --bg-primary:   #16172a;
-  --bg-secondary: #1e1f35;
-  --bg-tertiary:  #272845;
-  --bg-hover:     #2e2f52;
-  --bg-active:    #35366a;
+  --bg-primary:   #F0F2F5;   /* page background */
+  --bg-secondary: #FFFFFF;   /* panel / card surface */
+  --bg-tertiary:  #F5F5F5;   /* form fields, icon containers */
+  --bg-hover:     #EDEDED;   /* hover surface */
+  --bg-active:    #e8f5ee;   /* selected/active surface (light green tint) */
 
   /* Text */
-  --text-primary:   #ecedf5;
-  --text-secondary: #9899b2;
-  --text-muted:     #5f6075;
+  --text-primary:   #030303;
+  --text-secondary: #727272;
+  --text-muted:     #B8B8B8;
 
-  /* Accent */
-  --accent:       #6c63ff;
-  --accent-hover: #7d75ff;
-  --accent-dim:   rgba(108, 99, 255, 0.15);
-  --accent-glow:  rgba(108, 99, 255, 0.25);
+  /* Accent — Enput primary green */
+  --accent:       #409B62;
+  --accent-hover: #327a4e;
+  --accent-dim:   rgba(64, 155, 98, 0.12);   /* selected nav background */
+  --accent-glow:  rgba(64, 155, 98, 0.25);   /* focus glow on inputs */
 
-  /* Semantic */
-  --success: #4caf50;
-  --warning: #ff9800;
-  --error:   #f44336;
-  --info:    #29b6f6;
+  /* Semantic — Enput status palette */
+  --success: #00B578;
+  --warning: #FF8F1F;
+  --error:   #CD1414;
+  --info:    #1ABCFE;
 
   /* Borders */
-  --border:       #2e2f50;
-  --border-light: #3e3f68;
+  --border:       #E4E4E4;
+  --border-light: #EEEEEE;
 
   /* Layout */
   --sidebar-width: 240px;
   --header-height: 44px;
   --tab-height:    36px;
 
-  /* Typography */
-  --font-mono: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace;
-  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  /* Typography — Enput uses Inter for everything */
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 
-  /* Radii */
-  --radius:    6px;
+  /* Radii — Enput uses 8px default */
+  --radius:    8px;
   --radius-sm: 4px;
-  --radius-lg: 10px;
+  --radius-lg: 16px;
 
-  /* Shadows */
-  --shadow:    0 2px 8px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+  /* Shadows — single-layer subtle, per Enput tokens */
+  --shadow:    0 1px 3px rgba(0, 0, 0, 0.10);
+  --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.12);
 
   /* Transitions */
   --transition:      150ms ease;
   --transition-slow: 250ms ease;
+}
+
+/* ─── Tailwind theme mapping ────────────────────────────────────
+   Maps the :root CSS variables above to Tailwind v4 token names.
+   `@theme inline` keeps the variables referenced (vs. copied), so
+   changing `:root` values automatically updates the utilities.
+
+   Two sets of tokens coexist here:
+     • Our semantic names (bg-bg, bg-surface, text-fg, border-border…)
+       for new first-party code during the migration.
+     • shadcn/ui's expected names (bg-background, text-foreground,
+       bg-primary, bg-destructive, ring, …) so stock components work.
+
+   Both resolve to the same underlying CSS vars in `:root`, so a single
+   color-palette change ripples through everything.
+   ─────────────────────────────────────────────────────────────── */
+@theme inline {
+  /* Colors — surfaces */
+  --color-bg:          var(--bg-primary);
+  --color-surface:     var(--bg-secondary);
+  --color-surface-2:   var(--bg-tertiary);
+  --color-hover:       var(--bg-hover);
+  --color-active:      var(--bg-active);
+
+  /* Colors — text */
+  --color-fg:          var(--text-primary);
+  --color-fg-muted:    var(--text-secondary);
+  --color-fg-subtle:   var(--text-muted);
+
+  /* Colors — semantic */
+  --color-success:     var(--success);
+  --color-warning:     var(--warning);
+  --color-error:       var(--error);
+  --color-danger:      var(--error);
+  --color-info:        var(--info);
+
+  /* Colors — borders */
+  --color-border:        var(--border);
+  --color-border-strong: var(--border-light);
+
+  /* ── shadcn/ui aliases ──────────────────────────────────────
+     Standard shadcn components reference these token names
+     (bg-background, text-foreground, bg-primary, etc.). Aliasing
+     them to our existing semantic variables lets stock shadcn
+     components drop in and pick up our dark theme automatically. */
+  --color-background:             var(--bg-primary);
+  --color-foreground:             var(--text-primary);
+  --color-card:                   var(--bg-secondary);
+  --color-card-foreground:        var(--text-primary);
+  --color-popover:                var(--bg-secondary);
+  --color-popover-foreground:     var(--text-primary);
+  --color-primary:                var(--accent);
+  --color-primary-foreground:     #ffffff;
+  --color-secondary:              var(--bg-tertiary);
+  --color-secondary-foreground:   var(--text-primary);
+  --color-muted:                  var(--bg-tertiary);
+  --color-muted-foreground:       var(--text-secondary);
+  /* shadcn's `accent` slot is the hover/active neutral surface
+     (distinct from our brand `--accent` CSS var, which maps to
+     shadcn's `primary`). Tailwind utility `bg-accent` → hover surface;
+     brand color is `bg-primary`. */
+  --color-accent:                 var(--bg-hover);
+  --color-accent-foreground:      var(--text-primary);
+  --color-destructive:            var(--error);
+  --color-destructive-foreground: #ffffff;
+  --color-input:                  var(--border);
+  --color-ring:                   var(--accent);
+
+  /* Radii (override Tailwind defaults to match our scale) */
+  --radius-sm: 4px;
+  --radius:    6px;
+  --radius-lg: 10px;
+
+  /* Fonts */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace;
+
+  /* Shadows */
+  --shadow-panel: 0 2px 8px rgba(0, 0, 0, 0.4);
+  --shadow-lg:    0 8px 24px rgba(0, 0, 0, 0.5);
 }
 
 /* ─── Reset ────────────────────────────────────── */
@@ -71,18 +175,36 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* ─── Scrollbars ────────────────────────────────── */
-::-webkit-scrollbar        { width: 6px; height: 6px; }
+/* ─── Scrollbars ─────────────────────────────────
+   Light-theme scrollbars: subtle gray thumb on transparent track.
+   Inside dark surfaces (terminal, code editor) the children re-skin
+   their own scrollbars, so this rule only governs chrome scrollbars. */
+::-webkit-scrollbar        { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track  { background: transparent; }
-::-webkit-scrollbar-thumb  { background: var(--border-light); border-radius: 99px; }
-::-webkit-scrollbar-thumb:hover { background: #555680; }
+::-webkit-scrollbar-thumb  { background: #cfd2d6; border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: #a9adb3; }
 ::-webkit-scrollbar-corner { background: transparent; }
 
-/* ─── Focus ─────────────────────────────────────── */
+/* ─── Focus ─────────────────────────────────────────────────────
+   Keyboard-only focus ring (mouse clicks don't trigger :focus-visible
+   in modern browsers). `!important` is deliberate: many hand-rolled
+   components set `outline: 'none'` inline to suppress the browser
+   default; this rule ensures keyboard users still get a clear ring
+   without requiring a per-component edit.
+
+   Inputs/textareas/selects are exempted below — they express focus
+   with border-color + box-shadow glow (see :focus rule), so layering
+   an outline on top would be a double indicator.
+   ──────────────────────────────────────────────────────────────── */
 :focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--accent) !important;
   outline-offset: 2px;
-  border-radius: var(--radius-sm);
+}
+
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none !important;
 }
 
 /* ─── Buttons ────────────────────────────────────── */
@@ -137,8 +259,21 @@ input:focus, textarea:focus, select:focus {
 }
 
 .nav-item.active {
-  background: var(--accent-dim);
-  color: var(--accent);
+  /* Enput pattern: full green fill with white text on the selected nav item.
+     Matches the design-system sidebar spec exactly. */
+  background: var(--accent);
+  color: #fff;
+}
+
+.nav-item.active:hover {
+  background: var(--accent-hover);
+  color: #fff;
+}
+
+/* Lucide icon strokes inside an active nav item should pick up white
+   automatically (they use currentColor), but be explicit for safety. */
+.nav-item.active svg {
+  color: #fff;
 }
 
 .nav-item .shortcut-badge {
@@ -214,8 +349,11 @@ input:focus, textarea:focus, select:focus {
   bottom: calc(100% + 6px);
   left: 50%;
   transform: translateX(-50%);
-  background: var(--bg-active);
-  color: var(--text-primary);
+  /* Dark-on-light tooltip — high contrast against the light app chrome.
+     Hardcoded near-black so the tooltip remains the same in any future
+     theme variant. */
+  background: #1f1f1f;
+  color: #fff;
   font-size: 11px;
   padding: 4px 8px;
   border-radius: var(--radius-sm);
@@ -223,42 +361,10 @@ input:focus, textarea:focus, select:focus {
   pointer-events: none;
   opacity: 0;
   transition: opacity var(--transition);
-  border: 1px solid var(--border);
+  border: none;
   z-index: 100;
 }
 
 [data-tooltip]:hover::after {
   opacity: 1;
 }
-
-/* ─── Utility classes ────────────────────────────── */
-.flex          { display: flex; }
-.flex-col      { flex-direction: column; }
-.flex-1        { flex: 1; }
-.items-center  { align-items: center; }
-.justify-between { justify-content: space-between; }
-.gap-1  { gap: 4px; }
-.gap-2  { gap: 8px; }
-.gap-3  { gap: 12px; }
-.gap-4  { gap: 16px; }
-.p-2    { padding: 8px; }
-.p-3    { padding: 12px; }
-.p-4    { padding: 16px; }
-.px-2   { padding-left: 8px; padding-right: 8px; }
-.px-3   { padding-left: 12px; padding-right: 12px; }
-.py-1   { padding-top: 4px; padding-bottom: 4px; }
-.py-2   { padding-top: 8px; padding-bottom: 8px; }
-.overflow-hidden { overflow: hidden; }
-.overflow-auto   { overflow: auto; }
-.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.text-sm  { font-size: 12px; }
-.text-xs  { font-size: 11px; }
-.text-muted      { color: var(--text-muted); }
-.text-secondary  { color: var(--text-secondary); }
-.font-mono { font-family: var(--font-mono); }
-.w-full    { width: 100%; }
-.h-full    { height: 100%; }
-.relative  { position: relative; }
-.absolute  { position: absolute; }
-.cursor-pointer { cursor: pointer; }
-.select-none    { user-select: none; }

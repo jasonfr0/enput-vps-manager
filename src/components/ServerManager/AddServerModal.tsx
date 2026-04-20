@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useConnectionStore } from '../../context/useConnectionStore'
 
 interface AddServerModalProps {
@@ -6,6 +6,19 @@ interface AddServerModalProps {
 }
 
 export function AddServerModal({ onClose }: AddServerModalProps) {
+  // Escape closes the modal — mirrors the pattern used by ConfirmDialog so
+  // every dialog in the app responds the same way to keyboard dismiss.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        onClose()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
   const [name, setName] = useState('')
   const [host, setHost] = useState('')
   const [port, setPort] = useState('22')

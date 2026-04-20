@@ -1,10 +1,14 @@
 import React, { FormEvent, useEffect, useState } from 'react'
-import { ArrowLeft, Lock } from 'lucide-react'
+import { ArrowLeft, Lock, Plus, Server, Users } from 'lucide-react'
 import { TeamUser, UserRole } from '../../types/api'
 import { useSessionStore, ROLE_LABELS, ROLE_DESCRIPTIONS } from '../../context/useSessionStore'
 import { useConnectionStore } from '../../context/useConnectionStore'
 import { confirmDialog } from '../../context/useConfirmStore'
 import { notify } from '../../context/useNotificationStore'
+import { EmptyState } from '@/components/ui/empty-state'
+import { ErrorState } from '@/components/ui/error-state'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Button } from '@/components/ui/button'
 
 type View = 'list' | 'add' | 'edit' | 'password'
 
@@ -66,6 +70,8 @@ export function TeamPanel() {
   const [editTarget, setEditTarget] = useState<TeamUser | null>(null)
   const [busy, setBusy]       = useState(false)
   const [error, setError]     = useState('')
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   // Add user form
   const [newUsername, setNewUsername]   = useState('')
@@ -83,11 +89,15 @@ export function TeamPanel() {
   const [pwConfirm, setPwConfirm]       = useState('')
 
   const loadUsers = async () => {
+    setLoadError(null)
     try {
       const list = await usersApi.list()
       setUsers(list)
     } catch (e: any) {
       console.error('[TeamPanel] loadUsers:', e)
+      setLoadError(e?.message ?? 'Failed to load team members.')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -190,7 +200,14 @@ export function TeamPanel() {
     value, onChange
   }: { value: '*' | string[]; onChange: (v: '*' | string[]) => void }) {
     if (servers.length === 0) {
-      return <p style={{ color: 'var(--text-muted)', fontSize: '12px' }}>No servers configured yet.</p>
+      return (
+        <EmptyState
+          size="sm"
+          icon={Server}
+          title="No servers configured yet"
+          description="Add a server before assigning access."
+        />
+      )
     }
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -357,10 +374,26 @@ export function TeamPanel() {
       </div>
 
       <div style={styles.listWrap}>
-        {users.length === 0 ? (
-          <div style={styles.center}>
-            <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>No users yet.</p>
-          </div>
+        {loading ? (
+          <TeamPanelSkeleton />
+        ) : loadError ? (
+          <ErrorState
+            title="Couldn't load team"
+            description={loadError}
+            onRetry={() => { setLoading(true); loadUsers() }}
+          />
+        ) : users.length === 0 ? (
+          <EmptyState
+            icon={Users}
+            title="No team members yet"
+            description="Invite teammates to give them access to servers."
+            action={
+              <Button size="sm" onClick={openAdd}>
+                <Plus />
+                Add member
+              </Button>
+            }
+          />
         ) : (
           <table style={styles.table}>
             <thead>
@@ -618,4 +651,21 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 500,
     cursor: 'pointer',
   },
+}
+
+// Skeleton rows roughly shaped like the team member table.
+function TeamPanelSkeleton() {
+  return (
+    <div className="flex flex-col gap-2 p-3">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <div key={i} className="flex items-center gap-3">
+          <Skeleton className="h-3 w-[140px]" />
+          <Skeleton className="h-4 w-[72px] rounded" />
+          <Skeleton className="h-3 w-[110px]" />
+          <Skeleton className="h-3 w-[90px]" />
+          <Skeleton className="h-3 flex-1" />
+        </div>
+      ))}
+    </div>
+  )
 }
