@@ -36,6 +36,8 @@ export interface ElectronAPI {
     add: (config: any) => Promise<any>
     update: (config: any) => Promise<any>
     delete: (id: string) => Promise<void>
+    /** Rewrite a stored server's id (e.g. local → remote UUID). Returns true if a remap occurred. */
+    remapId: (oldId: string, newId: string) => Promise<boolean>
   }
   settings: {
     get: (key: string, defaultValue: any) => Promise<any>

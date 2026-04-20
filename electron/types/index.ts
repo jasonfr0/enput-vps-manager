@@ -123,6 +123,7 @@ export const IPC_CHANNELS = {
   SERVERS_ADD: 'servers:add',
   SERVERS_UPDATE: 'servers:update',
   SERVERS_DELETE: 'servers:delete',
+  SERVERS_REMAP_ID: 'servers:remapId',
 
   // Settings
   SETTINGS_GET: 'settings:get',

@@ -318,6 +318,13 @@ export function registerIpcHandlers(
     credentialManager.deleteServer(id)
   })
 
+  ipcMain.handle(
+    IPC_CHANNELS.SERVERS_REMAP_ID,
+    async (_, { oldId, newId }: { oldId: string; newId: string }) => {
+      return credentialManager.remapServerId(oldId, newId)
+    }
+  )
+
   // --- Settings Handlers ---
 
   ipcMain.handle(

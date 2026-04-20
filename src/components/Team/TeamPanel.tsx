@@ -33,7 +33,30 @@ function Badge({ role }: { role: UserRole }) {
 export function TeamPanel() {
   const currentUser  = useSessionStore((s) => s.currentUser)
   const isAdmin      = useSessionStore((s) => s.isAdmin)()
+  const isRemote     = useSessionStore((s) => s.isRemote)
   const servers      = useConnectionStore((s) => s.servers)
+
+  // Pick the right API based on whether this session is authenticated locally
+  // or against the remote auth server. The shapes are intentionally identical.
+  const usersApi = isRemote
+    ? {
+        list:           () => window.api.authServer.listUsers(),
+        create:         (u: string, p: string, r: UserRole, a: string[] | '*') =>
+                          window.api.authServer.createUser(u, p, r, a),
+        update:         (id: string, changes: { role?: UserRole; serverAccess?: string[] | '*' }) =>
+                          window.api.authServer.updateUser(id, changes),
+        delete:         (id: string) => window.api.authServer.deleteUser(id),
+        changePassword: (id: string, pw: string) => window.api.authServer.changePassword(id, pw),
+      }
+    : {
+        list:           () => window.api.users.list(),
+        create:         (u: string, p: string, r: UserRole, a: string[] | '*') =>
+                          window.api.users.create(u, p, r, a),
+        update:         (id: string, changes: { role?: UserRole; serverAccess?: string[] | '*' }) =>
+                          window.api.users.update(id, changes),
+        delete:         (id: string) => window.api.users.delete(id),
+        changePassword: (id: string, pw: string) => window.api.users.changePassword(id, pw),
+      }
 
   const [users, setUsers]     = useState<TeamUser[]>([])
   const [view, setView]       = useState<View>('list')
@@ -58,14 +81,14 @@ export function TeamPanel() {
 
   const loadUsers = async () => {
     try {
-      const list = await window.api.users.list()
+      const list = await usersApi.list()
       setUsers(list)
     } catch (e: any) {
       console.error('[TeamPanel] loadUsers:', e)
     }
   }
 
-  useEffect(() => { loadUsers() }, [])
+  useEffect(() => { loadUsers() }, [isRemote])
 
   const resetForms = () => {
     setNewUsername(''); setNewPassword(''); setNewConfirm('')
@@ -98,7 +121,7 @@ export function TeamPanel() {
     if (newPassword !== newConfirm) { setError('Passwords do not match'); return }
     setBusy(true)
     try {
-      await window.api.users.create(newUsername.trim(), newPassword, newRole, newAccess)
+      await usersApi.create(newUsername.trim(), newPassword, newRole, newAccess)
       await loadUsers()
       back()
     } catch (err: any) {
@@ -114,7 +137,7 @@ export function TeamPanel() {
     setBusy(true)
     setError('')
     try {
-      await window.api.users.update(editTarget.id, { role: editRole, serverAccess: editAccess })
+      await usersApi.update(editTarget.id, { role: editRole, serverAccess: editAccess })
       await loadUsers()
       back()
     } catch (err: any) {
@@ -132,7 +155,7 @@ export function TeamPanel() {
     setBusy(true)
     setError('')
     try {
-      await window.api.users.changePassword(editTarget.id, pwNew)
+      await usersApi.changePassword(editTarget.id, pwNew)
       back()
     } catch (err: any) {
       setError(err?.message ?? 'Failed to change password')
@@ -144,7 +167,7 @@ export function TeamPanel() {
   const handleDelete = async (u: TeamUser) => {
     if (!confirm(`Delete user "${u.username}"? This cannot be undone.`)) return
     try {
-      await window.api.users.delete(u.id)
+      await usersApi.delete(u.id)
       await loadUsers()
     } catch (err: any) {
       alert(err?.message ?? 'Failed to delete user')

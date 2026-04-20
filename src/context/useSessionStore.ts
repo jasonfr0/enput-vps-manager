@@ -45,6 +45,10 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     const user = get().currentUser
     if (!user) return false
     if (user.serverAccess === '*') return true
+    // Defensive: if serverAccess is not a proper array (e.g. empty, malformed, or
+    // a non-array value that slipped through), treat as "no access" rather than
+    // throwing on .includes().
+    if (!Array.isArray(user.serverAccess)) return false
     return user.serverAccess.includes(serverId)
   },
 }))

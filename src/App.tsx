@@ -97,21 +97,56 @@ export default function App() {
 
   // When logged in via remote auth server, merge shared servers from the registry
   // into the connection store so users don't have to re-add them manually.
-  // Dedup by host+port+username — the same VPS can have multiple entries for
-  // different Linux users (e.g. root vs antoine), each treated as distinct.
+  //
+  // Match locally-stored servers to remote ones by host+port+username (the same
+  // VPS can have multiple entries for different Linux users — e.g. root vs
+  // antoine — each treated as distinct). Where a match is found, rewrite the
+  // *local* record's id to the registry UUID. The per-user `serverAccess` list
+  // returned by the auth server references those UUIDs, so without this remap
+  // `canAccessServer()` would return false even for servers the operator is
+  // explicitly granted, causing the sidebar to hide them and the main pane to
+  // flash "Access Denied".
   useEffect(() => {
     if (!currentUser || !isRemote) return
-    window.api.authServer.listServers().then((remoteServers: any[]) => {
+    window.api.authServer.listServers().then(async (remoteServers: any[]) => {
       if (!remoteServers?.length) return
       const store = useConnectionStore.getState()
       const existing = store.servers
+
+      // Reconcile IDs: for each remote entry, find the matching local record
+      // (by host+port+username) whose id differs, and rewrite the local id to
+      // the remote UUID. Persist via the credential store so the mapping
+      // survives restarts.
+      const remaps: Array<{ oldId: string; newId: string }> = []
+      for (const r of remoteServers) {
+        const local = existing.find(
+          (l: any) => l.host === r.host && l.port === r.port && l.username === r.username
+        )
+        if (local && local.id !== r.id) {
+          remaps.push({ oldId: local.id, newId: r.id })
+        }
+      }
+      for (const { oldId, newId } of remaps) {
+        try {
+          await window.api.servers.remapId(oldId, newId)
+        } catch (err) {
+          console.warn('[App] Failed to remap server id', oldId, '→', newId, err)
+        }
+      }
+
+      // Rebuild the connection list: apply remaps to existing, then append any
+      // remote entries that don't have a local match.
+      const remapOf = new Map(remaps.map((m) => [m.oldId, m.newId]))
+      const remappedExisting = existing.map((l: any) =>
+        remapOf.has(l.id) ? { ...l, id: remapOf.get(l.id) } : l
+      )
       const toAdd = remoteServers.filter(
-        (r) => !existing.some(
+        (r) => !remappedExisting.some(
           (l: any) => l.host === r.host && l.port === r.port && l.username === r.username
         )
       )
-      if (toAdd.length > 0) {
-        store.setServers([...existing, ...toAdd])
+      if (remaps.length > 0 || toAdd.length > 0) {
+        store.setServers([...remappedExisting, ...toAdd])
       }
     }).catch(() => {/* auth server unreachable — silently ignore */})
   }, [currentUser, isRemote])

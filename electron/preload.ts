@@ -136,6 +136,8 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke(IPC_CHANNELS.SERVERS_UPDATE, config),
     delete: (id: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.SERVERS_DELETE, { id }),
+    remapId: (oldId: string, newId: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.SERVERS_REMAP_ID, { oldId, newId }),
   },
 
   // Settings

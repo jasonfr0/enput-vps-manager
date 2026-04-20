@@ -79,6 +79,29 @@ export class CredentialManager {
     log.info(`Server deleted: ${id}`)
   }
 
+  /**
+   * Rewrite a stored server's id. Used to reconcile a locally-added server's
+   * id with the UUID that the remote auth server's shared registry uses, so
+   * that per-user serverAccess lists (which reference the remote UUIDs) line
+   * up with the ids we use in the renderer.
+   *
+   * No-op if `oldId === newId` or no server with `oldId` exists. Throws if a
+   * different server already uses `newId`.
+   */
+  remapServerId(oldId: string, newId: string): boolean {
+    if (!oldId || !newId || oldId === newId) return false
+    const servers = this.getStoredServers()
+    const target = servers.find((s) => s.id === oldId)
+    if (!target) return false
+    if (servers.some((s) => s.id === newId)) {
+      throw new Error(`Cannot remap ${oldId} → ${newId}: destination id already in use`)
+    }
+    target.id = newId
+    this.store.set('servers', servers)
+    log.info(`Server id remapped: ${oldId} → ${newId}`)
+    return true
+  }
+
   // Settings
   getSetting<T>(key: string, defaultValue: T): T {
     return this.store.get(key, defaultValue) as T
