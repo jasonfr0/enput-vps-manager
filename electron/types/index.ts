@@ -153,6 +153,7 @@ export const IPC_CHANNELS = {
   AUDIT_LOG:       'audit:log',
   AUDIT_CLEAR:     'audit:clear',
   AUDIT_EXPORT_CSV:'audit:exportCsv',
+  AUDIT_SET_USER:  'audit:setCurrentUser',
 
   // User / team management (local)
   USER_IS_EMPTY:        'user:isEmpty',

@@ -240,6 +240,14 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke(IPC_CHANNELS.AUDIT_CLEAR),
     exportCsv: () =>
       ipcRenderer.invoke(IPC_CHANNELS.AUDIT_EXPORT_CSV),
+    /**
+     * Notify the main process of the current session user. Entries logged
+     * afterwards will carry attribution; non-admin viewers won't see admin
+     * actions. Pass `null` on logout.
+     */
+    setCurrentUser: (
+      user: { userId: string; username: string; userRole: 'admin' | 'operator' | 'readonly' } | null
+    ) => ipcRenderer.invoke(IPC_CHANNELS.AUDIT_SET_USER, user),
   },
 
   // Auto-updater

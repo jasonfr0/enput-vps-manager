@@ -23,16 +23,39 @@ interface SessionState {
   canAccessServer: (serverId: string) => boolean
 }
 
+/**
+ * Mirror the session user into the main-process AuditManager so new entries
+ * carry attribution and non-admin viewers don't see admin actions. Failures
+ * are silent — audit attribution should never block login.
+ */
+function pushUserToAudit(user: TeamUser | null): void {
+  try {
+    void window.api.audit.setCurrentUser(
+      user
+        ? { userId: user.id, username: user.username, userRole: user.role }
+        : null
+    )
+  } catch {
+    /* preload API may not yet be ready on first render — ignore */
+  }
+}
+
 export const useSessionStore = create<SessionState>((set, get) => ({
   currentUser: null,
   bootstrapped: false,
   needsSetup: false,
   isRemote: false,
 
-  setCurrentUser: (user) => set({ currentUser: user }),
+  setCurrentUser: (user) => {
+    set({ currentUser: user })
+    pushUserToAudit(user)
+  },
   setBootstrapped: (needsSetup) => set({ bootstrapped: true, needsSetup }),
   setRemote: (val) => set({ isRemote: val }),
-  logout: () => set({ currentUser: null, isRemote: false }),
+  logout: () => {
+    set({ currentUser: null, isRemote: false })
+    pushUserToAudit(null)
+  },
 
   isAdmin: () => get().currentUser?.role === 'admin',
   isOperator: () => {

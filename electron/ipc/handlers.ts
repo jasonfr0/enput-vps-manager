@@ -443,6 +443,16 @@ export function registerIpcHandlers(
     return auditManager.exportCsv()
   })
 
+  ipcMain.handle(
+    IPC_CHANNELS.AUDIT_SET_USER,
+    async (
+      _,
+      user: { userId: string; username: string; userRole: 'admin' | 'operator' | 'readonly' } | null
+    ) => {
+      auditManager.setCurrentUser(user ?? null)
+    }
+  )
+
   // --- User / Team Management Handlers ---
 
   ipcMain.handle(IPC_CHANNELS.USER_IS_EMPTY, () => {

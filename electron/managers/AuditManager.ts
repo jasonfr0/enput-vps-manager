@@ -2,6 +2,15 @@ import { app } from 'electron'
 import * as fs from 'fs'
 import * as path from 'path'
 
+export type AuditUserRole = 'admin' | 'operator' | 'readonly'
+
+/** Snapshot of who was logged in when an audit entry was produced. */
+export interface AuditActor {
+  userId: string
+  username: string
+  userRole: AuditUserRole
+}
+
 export interface AuditEntry {
   id: string
   timestamp: string
@@ -11,6 +20,10 @@ export interface AuditEntry {
   action: string
   details: string
   outcome: 'success' | 'failure'
+  /** User attribution. Absent on entries logged before attribution was added. */
+  userId?: string
+  username?: string
+  userRole?: AuditUserRole
 }
 
 export interface AuditFilter {
@@ -28,10 +41,24 @@ export class AuditManager {
   private serverLabels = new Map<string, string>()
   // `${connId}:${shellId}` → buffered command chars
   private cmdBuffers = new Map<string, string>()
+  // Currently-logged-in user in this Electron session. Stamped on each log
+  // entry and used to decide what non-admin viewers are allowed to see.
+  private currentUser: AuditActor | null = null
 
   constructor() {
     const dir = app.getPath('userData')
     this.logPath = path.join(dir, 'audit.jsonl')
+  }
+
+  // ── Session tracking ───────────────────────────────────────────────────────
+
+  /** Renderer calls this on login/logout so new log entries carry attribution. */
+  setCurrentUser(user: AuditActor | null): void {
+    this.currentUser = user
+  }
+
+  getCurrentUser(): AuditActor | null {
+    return this.currentUser
   }
 
   // ── Connection registry ────────────────────────────────────────────────────
@@ -107,9 +134,16 @@ export class AuditManager {
   // ── Core log write ─────────────────────────────────────────────────────────
 
   log(entry: Omit<AuditEntry, 'id' | 'timestamp'>): void {
+    // Stamp attribution if a user is logged in. Callers may also pass explicit
+    // userId/username/userRole (e.g. for background tasks tied to a past user);
+    // those win over the current-session snapshot.
+    const actor = this.currentUser
     const full: AuditEntry = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       timestamp: new Date().toISOString(),
+      ...(actor
+        ? { userId: actor.userId, username: actor.username, userRole: actor.userRole }
+        : {}),
       ...entry,
     }
     try {
@@ -135,6 +169,11 @@ export class AuditManager {
       try { return JSON.parse(l) } catch { return null }
     }).filter(Boolean) as AuditEntry[]
 
+    // Role-based visibility: non-admin viewers never see admin actions.
+    // Legacy entries with no userRole are treated as visible (backward
+    // compat — they predate attribution and can't be selectively hidden).
+    entries = this.applyVisibility(entries)
+
     if (filter.connId)   entries = entries.filter(e => e.connId === filter.connId)
     if (filter.category) entries = entries.filter(e => e.category === filter.category)
     if (filter.since)    entries = entries.filter(e => e.timestamp >= filter.since!)
@@ -155,6 +194,22 @@ export class AuditManager {
     return entries
   }
 
+  /**
+   * Hide admin-authored entries from non-admin viewers. Returns the input
+   * unchanged when the viewer is admin or when no user is set (legacy /
+   * bootstrap flows).
+   */
+  private applyVisibility(entries: AuditEntry[]): AuditEntry[] {
+    const viewer = this.currentUser
+    // No session: show everything (pre-login or bootstrap). The IPC handler
+    // can gate this separately if desired.
+    if (!viewer) return entries
+    // Admins see everything.
+    if (viewer.userRole === 'admin') return entries
+    // Non-admins: drop entries attributed to an admin.
+    return entries.filter((e) => e.userRole !== 'admin')
+  }
+
   // ── Maintenance ────────────────────────────────────────────────────────────
 
   clearAll(): void {
@@ -164,10 +219,12 @@ export class AuditManager {
   }
 
   exportCsv(): string {
+    // getEntries already applies role-based visibility.
     const entries = this.getEntries()
-    const header = 'id,timestamp,serverLabel,category,action,outcome,details'
+    const header = 'id,timestamp,username,userRole,serverLabel,category,action,outcome,details'
     const rows = entries.map(e =>
-      [e.id, e.timestamp, e.serverLabel, e.category, e.action, e.outcome,
+      [e.id, e.timestamp, e.username ?? '', e.userRole ?? '', e.serverLabel,
+       e.category, e.action, e.outcome,
        `"${e.details.replace(/"/g, '""')}"`].join(',')
     )
     return [header, ...rows].join('\n')

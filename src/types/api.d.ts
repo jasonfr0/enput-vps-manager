@@ -92,6 +92,14 @@ export interface ElectronAPI {
     }) => Promise<AuditEntry[]>
     clear: () => Promise<void>
     exportCsv: () => Promise<string>
+    /**
+     * Set (or clear, with `null`) the current session user. The main-process
+     * AuditManager stamps this attribution on new log entries and uses it to
+     * hide admin-authored entries from non-admin viewers.
+     */
+    setCurrentUser: (
+      user: { userId: string; username: string; userRole: UserRole } | null
+    ) => Promise<void>
   }
   authServer: {
     /** Persist the auth server base URL */
@@ -151,6 +159,10 @@ export interface AuditEntry {
   action: string
   details: string
   outcome: 'success' | 'failure'
+  /** Optional user attribution — absent on entries logged before attribution was added. */
+  userId?: string
+  username?: string
+  userRole?: UserRole
 }
 
 /** User record returned by the remote auth server */
