@@ -173,7 +173,7 @@ function CredentialModal({
 
 export function Sidebar({ activeTab, onTabChange, onAddServer, onOpenSettings }: SidebarProps) {
   const { servers, activeServerId, connectionStatus } = useConnectionStore()
-  const { currentUser, logout, isAdmin, canAccessServer } = useSessionStore()
+  const { currentUser, logout, isAdmin, canAccessServer, isRemote } = useSessionStore()
   const userIsAdmin = isAdmin()
 
   // Credential prompt state — set when a remote-registry server has no local creds
@@ -367,7 +367,18 @@ export function Sidebar({ activeTab, onTabChange, onAddServer, onOpenSettings }:
               <div style={styles.userRole}>{ROLE_LABELS[currentUser.role]}</div>
             </div>
           </div>
-          <button style={styles.logoutBtn} onClick={logout} title="Sign out">
+          <button
+            style={styles.logoutBtn}
+            title="Sign out"
+            onClick={async () => {
+              // For remote sessions, clear the persisted token first so
+              // LoginScreen's silent-refresh doesn't log right back in.
+              if (isRemote) {
+                try { await window.api.authServer.logout() } catch { /* ignore */ }
+              }
+              logout()
+            }}
+          >
             ↩
           </button>
         </div>
