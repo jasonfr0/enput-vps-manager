@@ -1,57 +1,48 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Plus, X } from 'lucide-react'
-import { TerminalView } from './TerminalView'
+import { ClaudeTerminal } from './ClaudeTerminal'
 
-interface TerminalTab {
+interface ClaudeTab {
   /**
-   * Local React-key + display id. The backend's PTY shellId is owned by the
-   * mounted TerminalView and is opaque to this wrapper — TerminalView creates
-   * its own shell on mount via window.api.terminal.create().
+   * Local React-key + display id. Each ClaudeTerminal instance owns its own
+   * PTY shellId, claudeStatus, workingDir, and directory picker — this wrapper
+   * just manages the tab list and which one is visible.
    */
   id: string
   label: string
 }
 
-interface TerminalTabsProps {
+interface ClaudeTerminalTabsProps {
   connId: string
-  /** When true, terminal output is shown but keyboard input is blocked */
-  readOnly?: boolean
   /** When true, this whole panel is currently visible — gates keyboard shortcuts + active-tab refit */
   isActive?: boolean
 }
 
 let nextLocalId = 0
-const makeId = () => `tab_${++nextLocalId}_${Date.now().toString(36)}`
+const makeId = () => `ctab_${++nextLocalId}_${Date.now().toString(36)}`
 
 /**
- * Tabbed wrapper around TerminalView.
+ * Tabbed wrapper around ClaudeTerminal.
  *
- * Each tab mounts its own TerminalView instance, which owns a single backend
- * PTY shellId. The IPC contract (terminal.create / write / resize / close /
- * onOutput) already supports many shells per connection, so this is a pure-UI
- * change with no backend touch.
- *
- * Tab state is local + keyed by connId — switching servers (or reconnecting,
- * which kills all PTYs server-side) resets to a single fresh tab. Keep all
- * tabs mounted so scrollback + shell state survive tab switches; visibility is
- * toggled with display:none to avoid React unmount + reconnect churn.
+ * Mirrors TerminalTabs in shape (keyboard shortcuts, rename UX, dark strip),
+ * but spawns ClaudeTerminal per tab so each session has its own Claude CLI
+ * status, working directory, and PTY. The IPC contract is identical to the
+ * regular shell terminal — ClaudeTerminal calls window.api.terminal.create()
+ * just like TerminalView, so no backend changes are needed.
  */
-export function TerminalTabs({ connId, readOnly = false, isActive = true }: TerminalTabsProps) {
-  const initialTab = useRef<TerminalTab>({ id: makeId(), label: 'Shell 1' })
-  const [tabs, setTabs]         = useState<TerminalTab[]>([initialTab.current])
+export function ClaudeTerminalTabs({ connId, isActive = true }: ClaudeTerminalTabsProps) {
+  const initialTab = useRef<ClaudeTab>({ id: makeId(), label: 'Claude 1' })
+  const [tabs, setTabs]         = useState<ClaudeTab[]>([initialTab.current])
   const [activeId, setActiveId] = useState<string>(initialTab.current.id)
   const counterRef              = useRef(1)
 
-  // Inline rename state. editingId points at the tab whose label is currently
-  // an <input>; draft holds the in-flight value so Escape can revert without
-  // the controlled input fighting React state.
+  // Inline rename state — same pattern as TerminalTabs.
   const [editingId, setEditingId] = useState<string | null>(null)
   const [draftLabel, setDraftLabel] = useState('')
 
-  // Reset tabs whenever the underlying connection changes — old PTYs are dead
-  // either way (different server, or backend tore them down on disconnect).
+  // Reset whenever the underlying connection changes.
   useEffect(() => {
-    const fresh = { id: makeId(), label: 'Shell 1' }
+    const fresh = { id: makeId(), label: 'Claude 1' }
     counterRef.current = 1
     setTabs([fresh])
     setActiveId(fresh.id)
@@ -60,9 +51,28 @@ export function TerminalTabs({ connId, readOnly = false, isActive = true }: Term
 
   const addTab = useCallback(() => {
     counterRef.current += 1
-    const t = { id: makeId(), label: `Shell ${counterRef.current}` }
+    const t = { id: makeId(), label: `Claude ${counterRef.current}` }
     setTabs((prev) => [...prev, t])
     setActiveId(t.id)
+  }, [])
+
+  const closeTab = useCallback((id: string) => {
+    setTabs((prev) => {
+      const next = prev.filter((t) => t.id !== id)
+      if (next.length === 0) {
+        const fresh = { id: makeId(), label: 'Claude 1' }
+        counterRef.current = 1
+        setActiveId(fresh.id)
+        return [fresh]
+      }
+      setActiveId((cur) => {
+        if (cur !== id) return cur
+        const idx = prev.findIndex((t) => t.id === id)
+        const target = next[Math.max(0, idx - 1)]
+        return target.id
+      })
+      return next
+    })
   }, [])
 
   const startRename = useCallback((id: string, currentLabel: string) => {
@@ -75,8 +85,6 @@ export function TerminalTabs({ connId, readOnly = false, isActive = true }: Term
     setEditingId((id) => {
       if (id === null) return null
       const trimmed = draftLabel.trim()
-      // Empty label = revert; otherwise persist (cap length so the strip
-      // doesn't get blown out by a paste).
       if (trimmed.length > 0) {
         const next = trimmed.slice(0, 40)
         setTabs((prev) => prev.map((t) => (t.id === id ? { ...t, label: next } : t)))
@@ -89,44 +97,12 @@ export function TerminalTabs({ connId, readOnly = false, isActive = true }: Term
     setEditingId(null)
   }, [])
 
-  const closeTab = useCallback((id: string) => {
-    setTabs((prev) => {
-      const next = prev.filter((t) => t.id !== id)
-
-      // Never leave zero tabs — replace with a fresh one so the panel always
-      // shows a usable terminal. (Closing the only tab is a more discoverable
-      // affordance than disabling the close button.)
-      if (next.length === 0) {
-        const fresh = { id: makeId(), label: 'Shell 1' }
-        counterRef.current = 1
-        setActiveId(fresh.id)
-        return [fresh]
-      }
-
-      // If we just closed the active tab, focus the neighbour to its left
-      // (or the new first tab if we closed the leftmost).
-      setActiveId((cur) => {
-        if (cur !== id) return cur
-        const idx = prev.findIndex((t) => t.id === id)
-        const target = next[Math.max(0, idx - 1)]
-        return target.id
-      })
-
-      return next
-    })
-  }, [])
-
   // ── Keyboard shortcuts ────────────────────────────────────────────────
-  // Only active when the terminal panel itself is visible. We intentionally
-  // require Shift on T/W so we don't steal Ctrl-T / Ctrl-W from the shell
-  // (transpose-chars in readline, common shortcuts in vim/less/irssi/etc.).
-  // Cmd/Ctrl + 1..9 is unambiguous in xterm so we use it bare for tab switching.
+  // Only active when this panel is visible. Same convention as TerminalTabs:
+  // Cmd/Ctrl+Shift+T add, Cmd/Ctrl+Shift+W close, Cmd/Ctrl+1..9 switch, F2 rename.
   useEffect(() => {
     if (!isActive) return
     const onKey = (e: KeyboardEvent) => {
-      // F2 — rename the active tab. No modifier required (matches the
-      // Finder/Explorer/VS Code convention). xterm doesn't bind F2 by
-      // default so this is safe in a focused terminal.
       if (e.key === 'F2' && editingId === null) {
         const tag = (document.activeElement?.tagName ?? '').toLowerCase()
         if (tag === 'input' || tag === 'textarea') return
@@ -149,7 +125,6 @@ export function TerminalTabs({ connId, readOnly = false, isActive = true }: Term
         closeTab(activeId)
         return
       }
-      // Cmd/Ctrl + 1..9 — switch to that tab if it exists
       if (!e.shiftKey && !e.altKey && e.key >= '1' && e.key <= '9') {
         const idx = Number(e.key) - 1
         if (idx < tabs.length) {
@@ -164,7 +139,7 @@ export function TerminalTabs({ connId, readOnly = false, isActive = true }: Term
 
   return (
     <div style={styles.root}>
-      <div style={styles.strip} role="tablist" aria-label="Terminal sessions">
+      <div style={styles.strip} role="tablist" aria-label="Claude Code sessions">
         <div style={styles.tabs}>
           {tabs.map((t, idx) => {
             const isCurrent = t.id === activeId
@@ -195,8 +170,6 @@ export function TerminalTabs({ connId, readOnly = false, isActive = true }: Term
                     onKeyDown={(e) => {
                       if (e.key === 'Enter')       { e.preventDefault(); commitRename() }
                       else if (e.key === 'Escape') { e.preventDefault(); cancelRename() }
-                      // Don't let Cmd/Ctrl+1..9 / Shift+T / Shift+W bubble to
-                      // the panel-level shortcut handler while editing.
                       else if (e.metaKey || e.ctrlKey) { e.stopPropagation() }
                     }}
                     onClick={(e) => e.stopPropagation()}
@@ -205,7 +178,7 @@ export function TerminalTabs({ connId, readOnly = false, isActive = true }: Term
                     maxLength={40}
                     spellCheck={false}
                     style={styles.tabInput}
-                    aria-label="Rename shell"
+                    aria-label="Rename Claude session"
                   />
                 ) : (
                   <span style={styles.tabLabel}>{t.label}</span>
@@ -233,8 +206,8 @@ export function TerminalTabs({ connId, readOnly = false, isActive = true }: Term
         <button
           onClick={addTab}
           style={styles.addBtn}
-          title={`New shell  •  ${ctrlOrCmdLabel()}+Shift+T`}
-          aria-label="New shell"
+          title={`New Claude session  •  ${ctrlOrCmdLabel()}+Shift+T`}
+          aria-label="New Claude session"
         >
           <Plus size={13} />
         </button>
@@ -244,10 +217,6 @@ export function TerminalTabs({ connId, readOnly = false, isActive = true }: Term
         {tabs.map((t) => {
           const isCurrent = t.id === activeId
           return (
-            // Keep every TerminalView mounted; toggle visibility so xterm
-            // keeps its scrollback + the PTY stays attached. display:none
-            // is fine here because TerminalView's isActive prop triggers a
-            // re-fit on the next frame when the tab becomes visible again.
             <div
               key={t.id}
               style={{
@@ -255,9 +224,8 @@ export function TerminalTabs({ connId, readOnly = false, isActive = true }: Term
                 display: isCurrent ? 'block' : 'none',
               }}
             >
-              <TerminalView
+              <ClaudeTerminal
                 connId={connId}
-                readOnly={readOnly}
                 isActive={isActive && isCurrent}
               />
             </div>
@@ -268,8 +236,6 @@ export function TerminalTabs({ connId, readOnly = false, isActive = true }: Term
   )
 }
 
-// Best-effort label for the modifier key in tooltips. Doesn't try to be
-// perfect — just nicer than always saying "Ctrl" on macOS.
 function ctrlOrCmdLabel(): string {
   if (typeof navigator !== 'undefined' && /Mac|iPhone|iPod|iPad/i.test(navigator.platform)) {
     return '⌘'
@@ -277,16 +243,14 @@ function ctrlOrCmdLabel(): string {
   return 'Ctrl'
 }
 
-// ─── Styles ──────────────────────────────────────────────────────
-// The terminal canvas stays dark even in light theme, so the tab strip uses
-// dark surfaces tuned to sit just above the terminal background (#1a1b2e).
+// Same dark strip as TerminalTabs — the Claude canvas is also dark (#1a1a2e).
 const styles: Record<string, React.CSSProperties> = {
   root: {
     position: 'absolute',
     inset: 0,
     display: 'flex',
     flexDirection: 'column',
-    background: '#1a1b2e',
+    background: '#1a1a2e',
     overflow: 'hidden',
   },
   strip: {
@@ -325,7 +289,7 @@ const styles: Record<string, React.CSSProperties> = {
     transition: 'background 120ms ease, color 120ms ease',
   },
   tabActive: {
-    background: '#1a1b2e',
+    background: '#1a1a2e',
     color: '#e8e9f0',
     boxShadow: 'inset 0 -2px 0 0 var(--accent)',
   },

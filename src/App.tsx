@@ -6,7 +6,7 @@ import { TerminalTabs } from './components/Terminal/TerminalTabs'
 import { FileBrowser } from './components/FileManager/FileBrowser'
 import { CodeEditor } from './components/Editor/CodeEditor'
 import { ChatInterface } from './components/Chat/ChatInterface'
-import { ClaudeTerminal } from './components/Terminal/ClaudeTerminal'
+import { ClaudeTerminalTabs } from './components/Terminal/ClaudeTerminalTabs'
 import { ResourceMonitor } from './components/Dashboard/ResourceMonitor'
 import { SettingsPanel } from './components/Settings/SettingsPanel'
 import { AuditLog } from './components/Audit/AuditLog'
@@ -353,7 +353,7 @@ export default function App() {
                 {/* Claude Code — PTY session must survive tab switches */}
                 <div style={pane('claude-cli')}>
                   {isOp
-                    ? <ClaudeTerminal connId={activeConnId!} isActive={activeTab === 'claude-cli'} />
+                    ? <ClaudeTerminalTabs connId={activeConnId!} isActive={activeTab === 'claude-cli'} />
                     : <AccessDeniedMsg feature="Claude Code" />}
                 </div>
 
