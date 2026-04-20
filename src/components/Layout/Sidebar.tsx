@@ -280,10 +280,10 @@ export function Sidebar({ activeTab, onTabChange, onAddServer, onOpenSettings }:
         </div>
 
         <div style={styles.serverList}>
-          {servers.length === 0 && (
+          {servers.filter(s => canAccessServer(s.id)).length === 0 && (
             <div style={styles.emptyServers}>No servers added yet</div>
           )}
-          {servers.map((server) => {
+          {servers.filter(s => canAccessServer(s.id)).map((server) => {
             const isActive = activeServerId === server.id
 
             return (

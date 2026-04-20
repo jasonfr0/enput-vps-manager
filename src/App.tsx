@@ -97,7 +97,8 @@ export default function App() {
 
   // When logged in via remote auth server, merge shared servers from the registry
   // into the connection store so users don't have to re-add them manually.
-  // Remote servers supplement local ones — duplicates (same host+port) are skipped.
+  // Dedup by host+port+username — the same VPS can have multiple entries for
+  // different Linux users (e.g. root vs antoine), each treated as distinct.
   useEffect(() => {
     if (!currentUser || !isRemote) return
     window.api.authServer.listServers().then((remoteServers: any[]) => {
@@ -105,7 +106,9 @@ export default function App() {
       const store = useConnectionStore.getState()
       const existing = store.servers
       const toAdd = remoteServers.filter(
-        (r) => !existing.some((l: any) => l.host === r.host && l.port === r.port)
+        (r) => !existing.some(
+          (l: any) => l.host === r.host && l.port === r.port && l.username === r.username
+        )
       )
       if (toAdd.length > 0) {
         store.setServers([...existing, ...toAdd])
