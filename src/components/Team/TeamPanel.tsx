@@ -3,6 +3,8 @@ import { ArrowLeft, Lock } from 'lucide-react'
 import { TeamUser, UserRole } from '../../types/api'
 import { useSessionStore, ROLE_LABELS, ROLE_DESCRIPTIONS } from '../../context/useSessionStore'
 import { useConnectionStore } from '../../context/useConnectionStore'
+import { confirmDialog } from '../../context/useConfirmStore'
+import { notify } from '../../context/useNotificationStore'
 
 type View = 'list' | 'add' | 'edit' | 'password'
 
@@ -166,12 +168,19 @@ export function TeamPanel() {
   }
 
   const handleDelete = async (u: TeamUser) => {
-    if (!confirm(`Delete user "${u.username}"? This cannot be undone.`)) return
+    const ok = await confirmDialog({
+      title: `Delete user "${u.username}"?`,
+      message: `This cannot be undone. ${u.username} will lose access immediately.`,
+      confirmLabel: 'Delete user',
+      variant: 'danger',
+    })
+    if (!ok) return
     try {
       await usersApi.delete(u.id)
       await loadUsers()
+      notify.success('User deleted', u.username)
     } catch (err: any) {
-      alert(err?.message ?? 'Failed to delete user')
+      notify.error('Failed to delete user', err?.message ?? String(err))
     }
   }
 

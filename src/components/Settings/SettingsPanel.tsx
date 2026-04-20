@@ -3,6 +3,8 @@ import { useSettingsStore, AppSettings } from '../../context/useSettingsStore'
 import { useUpdateStore } from '../../context/useUpdateStore'
 import { useSessionStore } from '../../context/useSessionStore'
 import { SSHKeyPanel } from '../SSHKeys/SSHKeyPanel'
+import { confirmDialog } from '../../context/useConfirmStore'
+import { notify } from '../../context/useNotificationStore'
 
 const TAB_OPTIONS = [
   { value: 'terminal',   label: 'Terminal' },
@@ -167,7 +169,18 @@ export function SettingsPanel() {
         <h2 style={s.title}>Settings</h2>
         <button
           style={s.resetBtn}
-          onClick={() => { if (confirm('Reset all settings to defaults?')) reset() }}
+          onClick={async () => {
+            const ok = await confirmDialog({
+              title: 'Reset all settings to defaults?',
+              message: 'Your preferences will be restored to their default values. Servers and credentials are not affected.',
+              confirmLabel: 'Reset settings',
+              variant: 'danger',
+            })
+            if (ok) {
+              reset()
+              notify.success('Settings reset', 'All preferences restored to defaults')
+            }
+          }}
         >
           Reset to defaults
         </button>

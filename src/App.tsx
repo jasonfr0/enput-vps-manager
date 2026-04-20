@@ -15,6 +15,7 @@ import { LoginScreen } from './components/Auth/LoginScreen'
 import { useSessionStore } from './context/useSessionStore'
 import { AddServerModal } from './components/ServerManager/AddServerModal'
 import { ToastContainer } from './components/UI/ToastContainer'
+import { ConfirmDialog } from './components/UI/ConfirmDialog'
 import { UpdateBanner } from './components/UI/UpdateBanner'
 import { useConnectionStore } from './context/useConnectionStore'
 import { useSettingsStore } from './context/useSettingsStore'
@@ -391,6 +392,7 @@ export default function App() {
         <AddServerModal onClose={() => setShowAddServer(false)} />
       )}
       <ToastContainer />
+      <ConfirmDialog />
     </div>
   )
 }

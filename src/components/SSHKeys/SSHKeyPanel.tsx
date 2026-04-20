@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react'
 import { RefreshCw, X } from 'lucide-react'
 import { useConnectionStore } from '../../context/useConnectionStore'
 import { notify } from '../../context/useNotificationStore'
+import { confirmDialog } from '../../context/useConfirmStore'
 
 interface SSHKeyInfo {
   name: string; privatePath: string; publicPath: string
@@ -224,7 +225,13 @@ export function SSHKeyPanel() {
   }
 
   const handleDelete = async (name: string) => {
-    if (!confirm(`Delete key pair "~/.ssh/${name}"?\n\nThis cannot be undone.`)) return
+    const ok = await confirmDialog({
+      title: `Delete key pair "~/.ssh/${name}"?`,
+      message: 'Both the private and public key files will be removed from this computer. This cannot be undone.',
+      confirmLabel: 'Delete key pair',
+      variant: 'danger',
+    })
+    if (!ok) return
     try {
       await (window.api as any).sshKeys.delete(name)
       setLocalKeys(prev => prev.filter(k => k.name !== name))
@@ -247,7 +254,13 @@ export function SSHKeyPanel() {
 
   const handleRemoveAuthorized = async (rawLine: string) => {
     if (!activeConnId) return
-    if (!confirm('Remove this key from the server\'s authorized_keys?')) return
+    const ok = await confirmDialog({
+      title: 'Remove this key from authorized_keys?',
+      message: 'The key will no longer grant access to this server. You can re-authorize it later.',
+      confirmLabel: 'Remove key',
+      variant: 'danger',
+    })
+    if (!ok) return
     try {
       await (window.api as any).sshKeys.removeAuthorized(activeConnId, rawLine)
       setAuthorizedKeys(prev => prev.filter(k => k.raw !== rawLine))

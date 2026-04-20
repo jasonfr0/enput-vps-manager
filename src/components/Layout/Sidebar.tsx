@@ -18,6 +18,8 @@ import {
 import { ActiveTab } from '../../App'
 import { useConnectionStore } from '../../context/useConnectionStore'
 import { useSessionStore, ROLE_LABELS } from '../../context/useSessionStore'
+import { confirmDialog } from '../../context/useConfirmStore'
+import { notify } from '../../context/useNotificationStore'
 
 interface SidebarProps {
   activeTab: ActiveTab
@@ -233,13 +235,23 @@ export function Sidebar({ activeTab, onTabChange, onAddServer, onOpenSettings }:
   }
 
   const handleDeleteServer = async (serverId: string) => {
-    if (!confirm('Delete this server?')) return
+    const server = servers.find((s) => s.id === serverId)
+    const name = server?.name ?? 'this server'
+    const ok = await confirmDialog({
+      title: `Delete "${name}"?`,
+      message: 'The saved credentials and configuration will be removed. Active sessions to this server will disconnect.',
+      confirmLabel: 'Delete server',
+      variant: 'danger',
+    })
+    if (!ok) return
     if (activeServerId === serverId) await handleDisconnect()
     try {
       await window.api.servers.delete(serverId)
       useConnectionStore.getState().removeServer(serverId)
+      notify.success('Server deleted', name)
     } catch (err: any) {
       console.error('Failed to delete server:', err)
+      notify.error('Failed to delete server', err?.message ?? String(err))
     }
   }
 

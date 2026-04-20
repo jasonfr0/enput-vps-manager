@@ -25,6 +25,7 @@ import {
   X,
 } from 'lucide-react'
 import { useFileStore } from '../../context/useFileStore'
+import { confirmDialog } from '../../context/useConfirmStore'
 
 interface FileBrowserProps {
   connId: string
@@ -225,9 +226,18 @@ export function FileBrowser({ connId, onOpenFile }: FileBrowserProps) {
 
   // ── Delete ─────────────────────────────────────────────────────
   const handleDelete = async (entry: any) => {
-    if (!confirm(`Delete "${entry.name}"?`)) return
+    const isDir = entry.type === 'directory'
+    const ok = await confirmDialog({
+      title: `Delete ${isDir ? 'folder' : 'file'} "${entry.name}"?`,
+      message: isDir
+        ? 'The folder and all of its contents will be removed from the server. This cannot be undone.'
+        : 'The file will be removed from the server. This cannot be undone.',
+      confirmLabel: `Delete ${isDir ? 'folder' : 'file'}`,
+      variant: 'danger',
+    })
+    if (!ok) return
     try {
-      if (entry.type === 'directory') {
+      if (isDir) {
         await (window.api.sftp as any).deleteDir(connId, entry.path)
       } else {
         await window.api.sftp.delete(connId, entry.path)
