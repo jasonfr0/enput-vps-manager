@@ -1,24 +1,28 @@
-import React, { useEffect, useState } from 'react'
+import React, { useState } from 'react'
+import { FolderOpen, KeyRound, Lock, Loader2, Check, AlertTriangle, Server } from 'lucide-react'
+
 import { useConnectionStore } from '../../context/useConnectionStore'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 
 interface AddServerModalProps {
   onClose: () => void
 }
 
+/**
+ * Add Server modal — uses shadcn Dialog for overlay/escape/focus-trap and
+ * shadcn Input/Button primitives for consistent styling. Logic (test +
+ * save) is unchanged from the previous hand-rolled version.
+ */
 export function AddServerModal({ onClose }: AddServerModalProps) {
-  // Escape closes the modal — mirrors the pattern used by ConfirmDialog so
-  // every dialog in the app responds the same way to keyboard dismiss.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        onClose()
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
-
   const [name, setName] = useState('')
   const [host, setHost] = useState('')
   const [port, setPort] = useState('22')
@@ -123,320 +127,208 @@ export function AddServerModal({ onClose }: AddServerModalProps) {
   }
 
   return (
-    <div style={styles.overlay} onClick={onClose}>
-      <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
-        <div style={styles.header}>
-          <h2 style={styles.title}>Add Server</h2>
-          <button style={styles.closeBtn} onClick={onClose}>
-            X
-          </button>
-        </div>
+    <Dialog open onOpenChange={(open) => { if (!open) onClose() }}>
+      <DialogContent className="sm:max-w-lg p-0 gap-0 overflow-hidden">
+        <DialogHeader className="px-5 pt-5 pb-4 border-b border-border">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-7 w-7 items-center justify-center rounded-md bg-[color:var(--accent-dim)] text-[color:var(--accent)]">
+              <Server className="size-3.5" />
+            </span>
+            <div className="flex flex-col gap-0.5 text-left">
+              <DialogTitle>Add Server</DialogTitle>
+              <DialogDescription>SSH connection details for a new VPS.</DialogDescription>
+            </div>
+          </div>
+        </DialogHeader>
 
-        <div style={styles.body}>
+        <div className="flex flex-col gap-3.5 px-5 py-4 max-h-[70vh] overflow-y-auto">
           {/* Name */}
-          <div style={styles.field}>
-            <label style={styles.label}>Name *</label>
-            <input
-              style={styles.input}
+          <Field label="Display name" required>
+            <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="My VPS Server"
+              autoFocus
             />
-          </div>
+          </Field>
 
           {/* Host + Port */}
-          <div style={styles.row}>
-            <div style={{ ...styles.field, flex: 3 }}>
-              <label style={styles.label}>Host *</label>
-              <input
-                style={styles.input}
-                value={host}
-                onChange={(e) => setHost(e.target.value)}
-                placeholder="192.168.1.1 or domain.com"
-              />
+          <div className="flex gap-2.5">
+            <div className="flex-[3]">
+              <Field label="Host" required>
+                <Input
+                  value={host}
+                  onChange={(e) => setHost(e.target.value)}
+                  placeholder="192.168.1.1 or domain.com"
+                />
+              </Field>
             </div>
-            <div style={{ ...styles.field, flex: 1 }}>
-              <label style={styles.label}>Port</label>
-              <input
-                style={styles.input}
-                value={port}
-                onChange={(e) => setPort(e.target.value)}
-                placeholder="22"
-                type="number"
-              />
+            <div className="flex-1 min-w-[80px]">
+              <Field label="Port">
+                <Input
+                  value={port}
+                  onChange={(e) => setPort(e.target.value)}
+                  placeholder="22"
+                  type="number"
+                  inputMode="numeric"
+                />
+              </Field>
             </div>
           </div>
 
           {/* Username */}
-          <div style={styles.field}>
-            <label style={styles.label}>Username *</label>
-            <input
-              style={styles.input}
+          <Field label="Username" required>
+            <Input
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               placeholder="root"
             />
-          </div>
+          </Field>
 
-          {/* Auth type */}
-          <div style={styles.field}>
-            <label style={styles.label}>Authentication</label>
-            <div style={styles.authToggle}>
-              <button
-                style={{
-                  ...styles.authBtn,
-                  ...(authType === 'key' ? styles.authBtnActive : {}),
-                }}
+          {/* Auth type — segmented toggle */}
+          <Field label="Authentication">
+            <div
+              role="tablist"
+              className="grid grid-cols-2 gap-1 rounded-md bg-[color:var(--bg-tertiary)] p-1"
+            >
+              <SegmentBtn
+                active={authType === 'key'}
                 onClick={() => setAuthType('key')}
-              >
-                SSH Key
-              </button>
-              <button
-                style={{
-                  ...styles.authBtn,
-                  ...(authType === 'password' ? styles.authBtnActive : {}),
-                }}
+                icon={<KeyRound className="size-3.5" />}
+                label="SSH Key"
+              />
+              <SegmentBtn
+                active={authType === 'password'}
                 onClick={() => setAuthType('password')}
-              >
-                Password
-              </button>
+                icon={<Lock className="size-3.5" />}
+                label="Password"
+              />
             </div>
-          </div>
+          </Field>
 
           {/* Key or password */}
           {authType === 'key' ? (
             <>
-              <div style={styles.field}>
-                <label style={styles.label}>Private Key File</label>
-                <div style={styles.filePickerRow}>
-                  <input
-                    style={{ ...styles.input, flex: 1 }}
+              <Field label="Private key file">
+                <div className="flex gap-2">
+                  <Input
+                    className="flex-1"
                     value={privateKeyPath}
                     onChange={(e) => setPrivateKeyPath(e.target.value)}
                     placeholder="/path/to/id_rsa"
                     readOnly
                   />
-                  <button style={styles.browseBtn} onClick={handleSelectKey}>
+                  <Button variant="outline" size="default" onClick={handleSelectKey} className="gap-1.5">
+                    <FolderOpen className="size-3.5" />
                     Browse
-                  </button>
+                  </Button>
                 </div>
-              </div>
-              <div style={styles.field}>
-                <label style={styles.label}>Key Passphrase (optional)</label>
-                <input
-                  style={styles.input}
+              </Field>
+              <Field label="Key passphrase" hint="Leave blank if your key isn't encrypted.">
+                <Input
                   type="password"
                   value={passphrase}
                   onChange={(e) => setPassphrase(e.target.value)}
-                  placeholder="Passphrase for encrypted keys"
+                  placeholder="Optional"
                 />
-              </div>
+              </Field>
             </>
           ) : (
-            <div style={styles.field}>
-              <label style={styles.label}>Password</label>
-              <input
-                style={styles.input}
+            <Field label="Password">
+              <Input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Server password"
               />
-            </div>
+            </Field>
           )}
 
-          {/* Error / success */}
-          {error && <div style={styles.error}>{error}</div>}
-          {testResult && <div style={styles.success}>{testResult}</div>}
+          {/* Inline status */}
+          {error && (
+            <div className="flex items-start gap-2 rounded-md border border-[rgba(205,20,20,0.20)] bg-[rgba(205,20,20,0.08)] px-3 py-2 text-xs text-[color:var(--error)]">
+              <AlertTriangle className="size-3.5 shrink-0 mt-0.5" />
+              <span>{error}</span>
+            </div>
+          )}
+          {testResult && (
+            <div className="flex items-start gap-2 rounded-md border border-[rgba(0,181,120,0.25)] bg-[rgba(0,181,120,0.10)] px-3 py-2 text-xs text-[color:var(--success)]">
+              <Check className="size-3.5 shrink-0 mt-0.5" />
+              <span>{testResult}</span>
+            </div>
+          )}
         </div>
 
-        <div style={styles.footer}>
-          <button
-            style={styles.testBtn}
+        <DialogFooter className="flex-row !justify-between border-t border-border px-5 py-3">
+          <Button
+            variant="outline"
             onClick={handleTest}
-            disabled={isTesting}
+            disabled={isTesting || isSaving}
+            className="gap-1.5"
           >
-            {isTesting ? 'Testing...' : 'Test Connection'}
-          </button>
-          <div style={styles.footerRight}>
-            <button style={styles.cancelBtn} onClick={onClose}>
+            {isTesting ? <Loader2 className="size-3.5 animate-spin" /> : null}
+            {isTesting ? 'Testing…' : 'Test connection'}
+          </Button>
+          <div className="flex gap-2">
+            <Button variant="ghost" onClick={onClose} disabled={isSaving}>
               Cancel
-            </button>
-            <button
-              style={styles.saveBtn}
-              onClick={handleSave}
-              disabled={isSaving}
-            >
-              {isSaving ? 'Saving...' : 'Save Server'}
-            </button>
+            </Button>
+            <Button onClick={handleSave} disabled={isSaving || isTesting} className="gap-1.5">
+              {isSaving ? <Loader2 className="size-3.5 animate-spin" /> : null}
+              {isSaving ? 'Saving…' : 'Save server'}
+            </Button>
           </div>
-        </div>
-      </div>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
-const styles: Record<string, React.CSSProperties> = {
-  overlay: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    background: 'rgba(0, 0, 0, 0.6)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 1000,
-  },
-  modal: {
-    width: '480px',
-    maxHeight: '90vh',
-    background: 'var(--bg-secondary)',
-    borderRadius: 'var(--radius)',
-    border: '1px solid var(--border)',
-    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
-    display: 'flex',
-    flexDirection: 'column',
-    overflow: 'hidden',
-  },
-  header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '16px 20px',
-    borderBottom: '1px solid var(--border)',
-  },
-  title: {
-    fontSize: '16px',
-    fontWeight: 600,
-    color: 'var(--text-primary)',
-  },
-  closeBtn: {
-    background: 'none',
-    border: 'none',
-    color: 'var(--text-muted)',
-    fontSize: '16px',
-    cursor: 'pointer',
-    padding: '4px',
-  },
-  body: {
-    padding: '20px',
-    overflow: 'auto',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '14px',
-  },
-  field: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '6px',
-  },
-  label: {
-    fontSize: '12px',
-    fontWeight: 500,
-    color: 'var(--text-secondary)',
-  },
-  input: {
-    padding: '8px 12px',
-    background: 'var(--bg-tertiary)',
-    border: '1px solid var(--border)',
-    borderRadius: 'var(--radius-sm)',
-    color: 'var(--text-primary)',
-    fontSize: '13px',
-    fontFamily: 'var(--font-sans)',
-    outline: 'none',
-  },
-  row: {
-    display: 'flex',
-    gap: '10px',
-  },
-  authToggle: {
-    display: 'flex',
-    border: '1px solid var(--border)',
-    borderRadius: 'var(--radius-sm)',
-    overflow: 'hidden',
-  },
-  authBtn: {
-    flex: 1,
-    padding: '8px',
-    border: 'none',
-    background: 'var(--bg-tertiary)',
-    color: 'var(--text-secondary)',
-    fontSize: '12px',
-    cursor: 'pointer',
-  },
-  authBtnActive: {
-    background: 'var(--accent)',
-    color: '#fff',
-  },
-  filePickerRow: {
-    display: 'flex',
-    gap: '8px',
-  },
-  browseBtn: {
-    padding: '8px 16px',
-    background: 'var(--bg-tertiary)',
-    border: '1px solid var(--border)',
-    borderRadius: 'var(--radius-sm)',
-    color: 'var(--text-secondary)',
-    fontSize: '12px',
-    cursor: 'pointer',
-    whiteSpace: 'nowrap' as const,
-  },
-  error: {
-    padding: '8px 12px',
-    background: 'rgba(244, 67, 54, 0.1)',
-    border: '1px solid rgba(244, 67, 54, 0.3)',
-    borderRadius: 'var(--radius-sm)',
-    color: 'var(--error)',
-    fontSize: '12px',
-  },
-  success: {
-    padding: '8px 12px',
-    background: 'rgba(76, 175, 80, 0.1)',
-    border: '1px solid rgba(76, 175, 80, 0.3)',
-    borderRadius: 'var(--radius-sm)',
-    color: 'var(--success)',
-    fontSize: '12px',
-  },
-  footer: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '14px 20px',
-    borderTop: '1px solid var(--border)',
-  },
-  testBtn: {
-    padding: '8px 16px',
-    border: '1px solid var(--border)',
-    borderRadius: 'var(--radius-sm)',
-    background: 'transparent',
-    color: 'var(--text-secondary)',
-    fontSize: '12px',
-    cursor: 'pointer',
-  },
-  footerRight: {
-    display: 'flex',
-    gap: '8px',
-  },
-  cancelBtn: {
-    padding: '8px 16px',
-    border: '1px solid var(--border)',
-    borderRadius: 'var(--radius-sm)',
-    background: 'transparent',
-    color: 'var(--text-secondary)',
-    fontSize: '12px',
-    cursor: 'pointer',
-  },
-  saveBtn: {
-    padding: '8px 20px',
-    background: 'var(--accent)',
-    color: '#fff',
-    border: 'none',
-    borderRadius: 'var(--radius-sm)',
-    fontSize: '12px',
-    fontWeight: 500,
-    cursor: 'pointer',
-  },
+// ─── Local helpers ───────────────────────────────────────────────────
+
+interface FieldProps {
+  label: string
+  required?: boolean
+  hint?: string
+  children: React.ReactNode
+}
+
+function Field({ label, required, hint, children }: FieldProps) {
+  return (
+    <label className="flex flex-col gap-1.5">
+      <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+        {label}
+        {required && <span className="ml-0.5 text-[color:var(--accent)]">*</span>}
+      </span>
+      {children}
+      {hint && <span className="text-[11px] text-muted-foreground">{hint}</span>}
+    </label>
+  )
+}
+
+interface SegmentBtnProps {
+  active: boolean
+  onClick: () => void
+  icon: React.ReactNode
+  label: string
+}
+
+function SegmentBtn({ active, onClick, icon, label }: SegmentBtnProps) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      className={
+        'flex items-center justify-center gap-1.5 rounded-sm px-3 py-1.5 text-xs font-medium transition-colors ' +
+        (active
+          ? 'bg-[color:var(--bg-secondary)] text-[color:var(--text-primary)] shadow-sm'
+          : 'text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]')
+      }
+    >
+      {icon}
+      {label}
+    </button>
+  )
 }

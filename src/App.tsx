@@ -17,6 +17,7 @@ import { AddServerModal } from './components/ServerManager/AddServerModal'
 import { ToastContainer } from './components/ui/ToastContainer'
 import { ConfirmDialog } from './components/ui/ConfirmDialog'
 import { UpdateBanner } from './components/ui/UpdateBanner'
+import { CommandPalette } from './components/CommandPalette/CommandPalette'
 import { useConnectionStore } from './context/useConnectionStore'
 import { useSettingsStore } from './context/useSettingsStore'
 import { useUpdateStore } from './context/useUpdateStore'
@@ -61,6 +62,7 @@ export default function App() {
     return (TAB_ORDER.includes(defaultTab as ActiveTab) ? defaultTab : 'terminal') as ActiveTab
   })
   const [showAddServer, setShowAddServer] = useState(false)
+  const [showPalette, setShowPalette] = useState(false)
   const [editorFile, setEditorFile] = useState<{ path: string; content: string } | null>(null)
   const { activeConnId, connectionStatus, activeServerId, servers } = useConnectionStore()
 
@@ -78,10 +80,17 @@ export default function App() {
     })
   }, [])
 
-  // Ctrl+1–7 tab shortcuts + Ctrl+, for settings
+  // Ctrl+K command palette + Ctrl+1–7 tab shortcuts + Ctrl+, for settings
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!e.ctrlKey && !e.metaKey) return
+      // Cmd/Ctrl+K — toggle command palette. Checked first so it takes
+      // priority over any other modifier-key combo.
+      if (e.key === 'k' || e.key === 'K') {
+        e.preventDefault()
+        setShowPalette((v) => !v)
+        return
+      }
       if (e.key === ',') {
         e.preventDefault()
         handleTabChange('settings')
@@ -391,6 +400,12 @@ export default function App() {
       {showAddServer && (
         <AddServerModal onClose={() => setShowAddServer(false)} />
       )}
+      <CommandPalette
+        open={showPalette}
+        onOpenChange={setShowPalette}
+        onTabChange={handleTabChange}
+        onAddServer={() => setShowAddServer(true)}
+      />
       <ToastContainer />
       <ConfirmDialog />
     </div>
