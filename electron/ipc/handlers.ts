@@ -299,7 +299,9 @@ export function registerIpcHandlers(
   })
 
   ipcMain.handle(IPC_CHANNELS.SERVERS_ADD, async (_, config: ServerConfig) => {
-    config.id = `server_${Date.now()}`
+    // Preserve an existing ID (e.g. from the remote registry) so that
+    // serverAccess checks keep working after credentials are saved locally.
+    if (!config.id) config.id = `server_${Date.now()}`
     credentialManager.saveServer(config)
     return config
   })

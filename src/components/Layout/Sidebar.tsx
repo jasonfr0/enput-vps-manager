@@ -63,8 +63,10 @@ function CredentialModal({
     if (authType === 'key'      && !keyPath)  { setError('Select a private key file'); return }
     setBusy(true)
     try {
-      // Save server locally with credentials — this creates a new entry with a local ID
+      // Save server locally with credentials, keeping the same ID it had on the
+      // remote registry so that serverAccess checks continue to work correctly.
       const saved = await window.api.servers.add({
+        id:             prompt.serverId,
         name:           prompt.name,
         host:           prompt.host,
         port:           prompt.port,
